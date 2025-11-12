@@ -1,0 +1,170 @@
+Here is a document detailing the current implementation plan for your app, based on our conversation.
+
+This plan has evolved from your original FYP report into a hybrid, on-device-first architecture. This design prioritizes user privacy, offline access, and fast local searching.
+
+-----
+
+## StudySync: Implementation Plan (On-Device RAG Architecture)
+
+### 1\. Core Philosophy
+
+The app will store all user-generated content (notes, OCR data, and vector embeddings) locally on the user's device. The cloud backend will be used as a set of stateless "services" (for OCR, Embedding, and LLM generation) that the app calls on demand.
+
+  * **Data Storage:** On-Device (e.g., ObjectBox)
+  * **Search/Retrieval:** On-Device (Offline)
+  * **AI Processing:** On-Demand (Cloud)
+  * **Sync:** Manual (via export/import), not automatic.
+
+-----
+
+### 2\. Key Components
+
+  * **On-Device (Client):**
+
+      * **Flutter App:** Manages all UI, state, and user interaction.
+      * **Local Database (e.g., ObjectBox):** Acts as the single source of truth for all user notes. It will store the original images, the structured OCR data, and the vector embeddings.
+
+  * **Cloud Services (FastAPI Backend):**
+
+      * **Service 1: OCR Model:** A server-side model (like Kosmos-2.5) that receives an image and returns structured text + coordinates.
+      * **Service 2: Embedding Model:** A server-side model (e.g., `BAAI/bge-large-en-v1.5`) that receives text and returns vector embeddings.
+      * **Service 3: Generative LLM:** A server-side model that receives an augmented prompt (context + query) and returns a generated answer.
+
+-----
+
+### 3\. Phase 1: Note Ingestion (Processing & Storing)
+
+This is a two-step process that happens when a user adds a new note.
+
+#### Step 1A: OCR Processing (Get Visual Data)
+
+This step gets the data needed to display the note.
+
+1.  **User** captures an image in the Flutter app.
+2.  **App** sends the raw image (as `multipart/form-data`) to the `/ocr/process-image` endpoint.
+3.  **OCR Service (Cloud)** processes the image and returns a JSON list of `OcrBlock`s (e.g., `{"text": "Hello", "coordinates": [x1, y1, x2, y2]}`).
+4.  **App** saves the original image path and this list of `OcrBlock`s to the local on-device database.
+5.  **Feature Unlocked:** The app can now render a "digital" version of the note by drawing the text blocks at their specific coordinates, perfectly reconstructing the note's layout for the user to read.
+
+#### Step 1B: Embedding (Get Searchable Data)
+
+This step indexes the note for searching and can be run in the background.
+
+1.  **App** reconstructs the full, clean text of the note by sorting and joining the `text` from the `OcrBlock`s it just saved.
+2.  **App** sends this single string of text to the `/embedding/chunk-and-embed` endpoint.
+3.  **Embedding Service (Cloud)** uses a text splitter (e.g., `RecursiveCharacterTextSplitter`) to create *new, semantically meaningful* chunks (ignoring the original OCR block divisions).
+4.  The service embeds each new chunk, returning a JSON list of `TextChunk` pairs (e.g., `{"chunk_text": "This is a full sentence.", "vector": [0.1, 0.2, ...]}`).
+5.  **App** saves this list of `TextChunk`s to the local database, creating a link from each chunk back to its parent `Note`.
+6.  **Feature Unlocked:** The note is now fully indexed for "Intelligent Search" and the "Smart Tutor."
+
+-----
+
+### 4\. Phase 2: Note Querying (Searching & Tutoring)
+
+This is how the user interacts with their indexed notes.
+
+#### Workflow 1: "Intelligent Search" (Offline)
+
+This feature is 100% on-device and offline.
+
+1.  **User** types a query (e.g., "Dijkstra's algorithm") in the search bar.
+2.  **App** sends this query string to the `/embedding/embed-query` endpoint (a simple endpoint that just returns a vector for a string).
+3.  **Embedding Service (Cloud)** returns the single query vector.
+4.  **App** performs a fast, local vector search (e.g., using ObjectBox's HNSW index) against the `TextChunk` database to find the top `k` matching chunks.
+5.  **App** displays these relevant `TextChunk`s (and a link to their parent note) as search results.
+
+#### Workflow 2: "Smart Tutor" (Online RAG)
+
+This feature retrieves context locally, then generates an answer in the cloud.
+
+1.  **User** asks a question to the tutor (e.g., "How does Dijkstra's algorithm work?").
+2.  **Retrieval (Local):** The app performs the *exact same "Intelligent Search"* (Steps 2-4 from Workflow 1) to find the most relevant `TextChunk`s from the user's notes. This is the **context**.
+3.  **Augmentation (Local):** The app crafts a *new, large prompt* that includes the user's original question *and* the retrieved context, like: `Context: [...text chunks...] --- Question: [...user's question...]`.
+4.  **Generation (Cloud):** The app sends this single, large "augmented prompt" to the `/llm/generate-answer` endpoint.
+5.  **LLM Service (Cloud)** generates an answer based *only* on the provided context and returns the text.
+6.  **App** displays the LLM's answer to the user.
+
+-----
+
+### 5\. On-Device Data Models (Example for ObjectBox)
+
+Your local database would be structured with these three main classes (entities).
+
+```dart
+import 'package:objectbox/objectbox.dart';
+
+// The main parent object
+@Entity()
+class Note {
+  @Id()
+  int id = 0;
+
+  // Path to the original image file stored on the device
+  String imagePath;
+
+  // You can add other metadata like title, date, etc.
+  String title;
+
+  Note({required this.imagePath, required this.title});
+}
+
+// Stores the VISUAL layout (from OCR Service)
+@Entity()
+class OcrBlock {
+  @Id()
+  int id = 0;
+
+  String text;
+  List<int> coordinates; // [x1, y1, x2, y2]
+
+  // Link back to the parent Note
+  final note = ToOne<Note>();
+
+  OcrBlock({required this.text, required this.coordinates});
+}
+
+// Stores the SEARCHABLE data (from Embedding Service)
+@Entity()
+class TextChunk {
+  @Id()
+  int id = 0;
+
+  // The semantically meaningful text chunk
+  String chunkText;
+
+  // The searchable vector (384 dimensions for all-MiniLM-L6-v2)
+  @HnswIndex(dimensions: 384)
+  List<double> vector;
+
+  // Link back to the parent Note
+  final note = ToOne<Note>();
+
+  TextChunk({required this.chunkText, required this.vector});
+}
+```
+
+-----
+
+### 6\. Cloud API Endpoints (FastAPI)
+
+This is the "contract" your Flutter app will use to talk to the server.
+
+1.  `POST /ocr/process-image`
+
+      * **Input:** `multipart/form-data` with an `image_file`.
+      * **Output:** `JSON` (e.g., `{"blocks": [{"text": "...", "coordinates": [...]}, ...]}`)
+
+2.  `POST /embedding/chunk-and-embed`
+
+      * **Input:** `JSON` (e.g., `{"text": "A single long string of text..."}`)
+      * **Output:** `JSON` (e.g., `{"embeddings": [{"chunk_text": "...", "vector": [...]}, ...]}`)
+
+3.  `POST /embedding/embed-query`
+
+      * **Input:** `JSON` (e.g., `{"text": "User's search query"}`)
+      * **Output:** `JSON` (e.g., `{"vector": [0.1, 0.2, ...]}`)
+
+4.  `POST /llm/generate-answer`
+
+      * **Input:** `JSON` (e.g., `{"prompt": "Context: ... --- Question: ..."}`)
+      * **Output:** `JSON` (e.g., `{"answer": "Based on your notes..."}`)

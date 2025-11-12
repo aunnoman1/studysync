@@ -1,0 +1,119 @@
+# --------
+# General OS / Editors
+# --------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.orig
+*.rej
+*.log
+
+# --------
+# Flutter / Dart (app/ subdirectory and any Flutter package)
+# --------
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.fvm/
+.melos_tool/
+coverage/
+build/
+
+# Keep pubspec.lock for apps; it's important for reproducible builds.
+# Do NOT ignore: pubspec.lock
+
+# Android
+**/android/.gradle/
+**/android/local.properties
+**/android/**/build/
+**/*.iml
+**/captures/
+**/.cxx/
+
+# iOS / macOS (Xcode)
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/.symlinks/
+**/ios/Pods/
+**/macos/Pods/
+**/ios/DerivedData/
+**/macos/DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+**/*.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+**/*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+**/*.xcworkspace/contents.xcworkspacedata
+**/*.xcodeproj/project.xcworkspace/
+**/*.xcuserdata/
+**/*.xcuserstate
+**/*.xcuserdatad
+
+# Linux / Windows Flutter ephemeral
+**/linux/flutter/ephemeral/
+**/windows/flutter/ephemeral/
+
+# CocoaPods (keep Podfile.lock)
+**/Pods/
+
+# ObjectBox
+# Keep generated bindings and model in VCS (recommended by ObjectBox).
+# Do NOT ignore: objectbox.g.dart, objectbox-model.json
+
+# --------
+# Python
+# --------
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.env
+.env.*
+.venv/
+venv/
+ENV/
+env/
+pip-wheel-metadata/
+dist/
+build/
+develop-eggs/
+downloads/
+.eggs/
+eggs/
+*.egg-info/
+*.egg
+
+# Test / Coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.dmypy.json
+.pyre/
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Compiled libraries
+*.so
+*.dylib
+*.dll
+
+# Packaging / Installer
+wheelhouse/
+sdist/
+
+# Misc
+.mr.developer.cfg
+.envrc
+
+

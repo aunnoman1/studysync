@@ -4,54 +4,170 @@
   "_note3": "If you have VCS merge conflicts, you must resolve them according to ObjectBox docs.",
   "entities": [
     {
-      "id": "1:1407255643202042497",
-      "lastPropertyId": "6:9123639503545899433",
-      "name": "CapturedNote",
+      "id": "2:8096816320279634532",
+      "lastPropertyId": "9:6593863165600246778",
+      "name": "NoteRecord",
       "properties": [
         {
-          "id": "1:1101611934885520711",
+          "id": "1:5823957033698403166",
           "name": "id",
           "type": 6,
           "flags": 1
         },
         {
-          "id": "2:9031447168788706071",
-          "name": "createdAt",
-          "type": 10
-        },
-        {
-          "id": "3:4804992250534136546",
-          "name": "imageBytes",
-          "type": 23
-        },
-        {
-          "id": "4:8554364282912279380",
+          "id": "2:1400081338485133557",
           "name": "title",
           "type": 9
         },
         {
-          "id": "5:73526378004897827",
+          "id": "3:7006692033893806498",
           "name": "course",
           "type": 9
         },
         {
-          "id": "6:9123639503545899433",
+          "id": "4:2298737130782990020",
           "name": "textContent",
           "type": 9
+        },
+        {
+          "id": "5:1034824678108998241",
+          "name": "imageBytes",
+          "type": 23
+        },
+        {
+          "id": "6:6757691179404252860",
+          "name": "createdAt",
+          "type": 10
+        },
+        {
+          "id": "7:3917043915054652833",
+          "name": "updatedAt",
+          "type": 10
+        },
+        {
+          "id": "8:4063773341907572248",
+          "name": "ocrProcessed",
+          "type": 1
+        },
+        {
+          "id": "9:6593863165600246778",
+          "name": "embeddingProcessed",
+          "type": 1
+        }
+      ],
+      "relations": [
+        {
+          "id": "1:5525636473163963231",
+          "name": "ocrBlocks",
+          "targetId": "3:2554812963669290589"
+        },
+        {
+          "id": "2:2812691182370582728",
+          "name": "textChunks",
+          "targetId": "4:6369069679209550495"
+        }
+      ]
+    },
+    {
+      "id": "3:2554812963669290589",
+      "lastPropertyId": "6:3363475017351110564",
+      "name": "OcrBlock",
+      "properties": [
+        {
+          "id": "1:4650884679241120260",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:120821145252514164",
+          "name": "noteId",
+          "indexId": "1:2181264681781770524",
+          "type": 11,
+          "flags": 520,
+          "relationTarget": "NoteRecord"
+        },
+        {
+          "id": "3:2228320061846295229",
+          "name": "text",
+          "type": 9
+        },
+        {
+          "id": "4:19502852114424581",
+          "name": "page",
+          "type": 6
+        },
+        {
+          "id": "5:2534251465913884149",
+          "name": "readingOrder",
+          "type": 6
+        },
+        {
+          "id": "6:3363475017351110564",
+          "name": "quad",
+          "type": 23
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "4:6369069679209550495",
+      "lastPropertyId": "5:3822847089250582595",
+      "name": "TextChunk",
+      "properties": [
+        {
+          "id": "1:8737686419980801735",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:9192977927797312722",
+          "name": "noteId",
+          "indexId": "2:1894151749029052286",
+          "type": 11,
+          "flags": 520,
+          "relationTarget": "NoteRecord"
+        },
+        {
+          "id": "3:2854811201605913319",
+          "name": "chunkText",
+          "type": 9
+        },
+        {
+          "id": "4:5316617707366664484",
+          "name": "embedding",
+          "indexId": "3:2725544423793281334",
+          "type": 28,
+          "flags": 8
+        },
+        {
+          "id": "5:3822847089250582595",
+          "name": "orderIndex",
+          "type": 6
         }
       ],
       "relations": []
     }
   ],
-  "lastEntityId": "1:1407255643202042497",
-  "lastIndexId": "0:0",
-  "lastRelationId": "0:0",
+  "lastEntityId": "4:6369069679209550495",
+  "lastIndexId": "3:2725544423793281334",
+  "lastRelationId": "2:2812691182370582728",
   "lastSequenceId": "0:0",
   "modelVersion": 5,
   "modelVersionParserMinimum": 5,
-  "retiredEntityUids": [],
+  "retiredEntityUids": [
+    1407255643202042497
+  ],
   "retiredIndexUids": [],
-  "retiredPropertyUids": [],
+  "retiredPropertyUids": [
+    1101611934885520711,
+    9031447168788706071,
+    4804992250534136546,
+    8554364282912279380,
+    73526378004897827,
+    9123639503545899433
+  ],
   "retiredRelationUids": [],
   "version": 1
 }

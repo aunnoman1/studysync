@@ -1,13 +1,17 @@
 import 'package:objectbox/objectbox.dart';
-import 'models/captured_note.dart';
+import 'models/note_record.dart';
 import 'objectbox.g.dart'; // generated
 
 class ObjectBox {
   late final Store store;
-  late final Box<CapturedNote> capturedNoteBox;
+  late final Box<NoteRecord> noteBox;
+  late final Box<OcrBlock> ocrBlockBox;
+  late final Box<TextChunk> textChunkBox;
 
   ObjectBox._create(this.store) {
-    capturedNoteBox = Box<CapturedNote>(store);
+    noteBox = Box<NoteRecord>(store);
+    ocrBlockBox = Box<OcrBlock>(store);
+    textChunkBox = Box<TextChunk>(store);
   }
 
   static Future<ObjectBox> create() async {
@@ -15,5 +19,3 @@ class ObjectBox {
     return ObjectBox._create(store);
   }
 }
-
-

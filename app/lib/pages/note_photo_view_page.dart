@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import '../models/captured_note.dart';
+import '../models/note_record.dart';
 import '../theme.dart';
 
 class NotePhotoViewPage extends StatelessWidget {
-  final CapturedNote note;
+  final NoteRecord note;
   final VoidCallback onBack;
-  final void Function(CapturedNote note, String newTitle) onRename;
-  final void Function(CapturedNote note, String newCourse) onUpdateCourse;
-  final void Function(CapturedNote note) onDelete;
+  final void Function(NoteRecord note, String newTitle) onRename;
+  final void Function(NoteRecord note, String newCourse) onUpdateCourse;
+  final void Function(NoteRecord note) onDelete;
   const NotePhotoViewPage({
     super.key,
     required this.note,

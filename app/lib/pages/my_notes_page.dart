@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/captured_note.dart';
+import '../models/note_record.dart';
 import '../theme.dart';
 
 String _formatDate(DateTime dt) {
@@ -12,9 +12,9 @@ String _formatDate(DateTime dt) {
 
 class MyNotesPage extends StatelessWidget {
   final void Function() onCreateNew;
-  final List<CapturedNote> capturedNotes;
-  final void Function(CapturedNote note) onOpenCaptured;
-  final void Function(CapturedNote note) onDeleteCaptured;
+  final List<NoteRecord> capturedNotes;
+  final void Function(NoteRecord note) onOpenCaptured;
+  final void Function(NoteRecord note) onDeleteCaptured;
 
   const MyNotesPage({
     super.key,

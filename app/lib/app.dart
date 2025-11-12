@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'models/note.dart';
 import 'models/captured_note.dart';
 import 'pages/auth_page.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/my_notes_page.dart';
-import 'pages/note_editor_page.dart';
 import 'pages/note_capture_page.dart';
 import 'pages/note_photo_view_page.dart';
 import 'pages/ai_tutor_page.dart';
@@ -47,8 +45,6 @@ class _AppShell extends StatefulWidget {
 class _AppShellState extends State<_AppShell> {
   bool isAuthenticated = false;
   ActiveTab activeTab = ActiveTab.dashboard;
-  Note? editingNote;
-  bool isCreatingNew = false;
   bool isCapturingNote = false;
   final List<CapturedNote> _capturedNotes = [];
   CapturedNote? _viewingCaptured;
@@ -64,20 +60,9 @@ class _AppShellState extends State<_AppShell> {
 
   void _openEditorNew() {
     setState(() {
-      // Switch to image capture flow for now
+      // Switch to image capture/text flow
       isCapturingNote = true;
-      isCreatingNew = false;
-      editingNote = null;
       activeTab = ActiveTab.myNotes;
-    });
-  }
-
-  // void _openEditor(Note note) {} // legacy editor path (unused)
-
-  void _closeEditor() {
-    setState(() {
-      isCreatingNew = false;
-      editingNote = null;
     });
   }
 
@@ -169,14 +154,6 @@ class _AppShellState extends State<_AppShell> {
         onDelete: (note) {
           _deleteCaptured(note);
         },
-      );
-    }
-    if (activeTab == ActiveTab.myNotes &&
-        (isCreatingNew || editingNote != null)) {
-      return NoteEditorPage(
-        isNew: isCreatingNew,
-        note: editingNote,
-        onBack: _closeEditor,
       );
     }
     switch (activeTab) {

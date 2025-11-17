@@ -15,6 +15,7 @@ import 'objectbox.dart';
 import 'services/ocr_service.dart';
 import 'dart:typed_data';
 import 'objectbox.g.dart';
+import 'env.dart';
 
 class StudySyncApp extends StatelessWidget {
   final ObjectBox db;
@@ -70,7 +71,7 @@ class _AppShellState extends State<_AppShell> {
       _ocrFailed.remove(image.id);
       _ocrInProgress.add(image.id);
       setState(() {});
-      final ocr = OcrService(baseUrl: 'http://localhost:8000');
+      final ocr = OcrService(baseUrl: Env.serverUrl);
       final blocks = await ocr.detect(image.imageBytes);
       for (final b in blocks) {
         final quadI32 = Int32List.fromList(b.quad);

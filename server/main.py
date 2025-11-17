@@ -1,6 +1,12 @@
 import io
 import re  # <-- 1. ADDED IMPORT
 from contextlib import asynccontextmanager
+import os
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except Exception:
+    pass
 import torch
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -299,5 +305,8 @@ async def get_last_image():
 async def root():
     return {"message": "OCR server is running. POST images to /ocr or go to /test to upload. Go to /view-last-image to see the last uploaded image."}
 
-# To run this app, save it as main.py and run:
-# uvicorn main:app --reload --host 0.0.0.loc
+if __name__ == "__main__":
+    import uvicorn
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("main:app", host=host, port=port, reload=True)

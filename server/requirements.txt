@@ -5,3 +5,4 @@ torch
 transformers
 Pillow
 accelerate
+python-dotenv

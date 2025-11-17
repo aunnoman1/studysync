@@ -18,6 +18,10 @@ class NotePhotoViewPage extends StatelessWidget {
   final int currentIndex;
   final void Function(List<Uint8List> images) onAddImages;
   final VoidCallback? onDeleteCurrentImage;
+  final bool isEmbProcessing;
+  final bool isEmbFailed;
+  final int embChunkCount;
+  final VoidCallback onRetryEmbeddings;
   final VoidCallback? onPrevImage;
   final VoidCallback? onNextImage;
   const NotePhotoViewPage({
@@ -35,6 +39,10 @@ class NotePhotoViewPage extends StatelessWidget {
     required this.currentIndex,
     required this.onAddImages,
     required this.onDeleteCurrentImage,
+    required this.isEmbProcessing,
+    required this.isEmbFailed,
+    required this.embChunkCount,
+    required this.onRetryEmbeddings,
     required this.onPrevImage,
     required this.onNextImage,
   });
@@ -338,6 +346,61 @@ class NotePhotoViewPage extends StatelessWidget {
                     ),
                   ),
                 ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text(
+                      'Embeddings:',
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(width: 8),
+                    if (isEmbProcessing) ...[
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'processing...',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ] else if (isEmbFailed) ...[
+                      OutlinedButton.icon(
+                        onPressed: onRetryEmbeddings,
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Retry'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                        ),
+                      ),
+                    ] else if (note.embeddingProcessed) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E3A8A),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'ready ($embChunkCount)',
+                          style: const TextStyle(
+                            color: Color(0xFFBFDBFE),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),

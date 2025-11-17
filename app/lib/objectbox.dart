@@ -5,11 +5,13 @@ import 'objectbox.g.dart'; // generated
 class ObjectBox {
   late final Store store;
   late final Box<NoteRecord> noteBox;
+  late final Box<NoteImage> noteImageBox;
   late final Box<OcrBlock> ocrBlockBox;
   late final Box<TextChunk> textChunkBox;
 
   ObjectBox._create(this.store) {
     noteBox = Box<NoteRecord>(store);
+    noteImageBox = Box<NoteImage>(store);
     ocrBlockBox = Box<OcrBlock>(store);
     textChunkBox = Box<TextChunk>(store);
   }

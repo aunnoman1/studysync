@@ -5,3 +5,6 @@ torch
 transformers
 Pillow
 accelerate
+python-dotenv
+sentence-transformers
+langchain-text-splitters

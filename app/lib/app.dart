@@ -12,6 +12,11 @@ import 'pages/profile_page.dart';
 import 'theme.dart';
 import 'widgets/sidebar.dart';
 import 'objectbox.dart';
+import 'services/ocr_service.dart';
+import 'services/embedding_service.dart';
+import 'dart:typed_data';
+import 'objectbox.g.dart';
+import 'env.dart';
 
 class StudySyncApp extends StatelessWidget {
   final ObjectBox db;
@@ -48,6 +53,12 @@ class _AppShellState extends State<_AppShell> {
   bool isCapturingNote = false;
   final List<NoteRecord> _notes = [];
   NoteRecord? _viewingNote;
+  final List<NoteImage> _viewingImages = [];
+  int _currentImageIndex = 0;
+  final Set<int> _ocrInProgress = <int>{};
+  final Set<int> _ocrFailed = <int>{};
+  final Set<int> _embInProgress = <int>{};
+  final Set<int> _embFailed = <int>{};
 
   @override
   void initState() {
@@ -56,6 +67,78 @@ class _AppShellState extends State<_AppShell> {
     final loaded = widget.db.noteBox.getAll();
     loaded.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _notes.addAll(loaded);
+  }
+
+  Future<void> _runOcrForImage(NoteImage image) async {
+    try {
+      _ocrFailed.remove(image.id);
+      _ocrInProgress.add(image.id);
+      setState(() {});
+      final ocr = OcrService(baseUrl: Env.serverUrl);
+      final blocks = await ocr.detect(image.imageBytes);
+      for (final b in blocks) {
+        final quadI32 = Int32List.fromList(b.quad);
+        final quadBytes = quadI32.buffer.asUint8List();
+        final ob = OcrBlock(text: b.text, quad: quadBytes);
+        ob.image.target = image;
+        widget.db.ocrBlockBox.put(ob);
+      }
+      image.ocrProcessed = true;
+      widget.db.noteImageBox.put(image);
+      // If this was the last pending image for the note, kick off embeddings
+      final parent = image.note.target;
+      if (parent != null) {
+        final q = widget.db.noteImageBox
+            .query(NoteImage_.note.equals(parent.id))
+            .build();
+        final imgs = q.find();
+        q.close();
+        if (imgs.isNotEmpty && imgs.every((i) => i.ocrProcessed)) {
+          // All pages processed, run embeddings for the whole note
+          await _runEmbeddingsForNote(parent);
+        }
+      }
+    } catch (e) {
+      print('OCR failed: $e');
+      _ocrFailed.add(image.id);
+    } finally {
+      _ocrInProgress.remove(image.id);
+      setState(() {});
+    }
+  }
+
+  Future<void> _runOcrForPendingImages(NoteRecord note) async {
+    final q = widget.db.noteImageBox
+        .query(NoteImage_.note.equals(note.id))
+        .build();
+    final imgs = q.find();
+    q.close();
+    for (final img in imgs) {
+      if (!img.ocrProcessed) {
+        await _runOcrForImage(img);
+      }
+    }
+    // After attempting all pending images, if all are processed, trigger embeddings
+    final q2 = widget.db.noteImageBox
+        .query(NoteImage_.note.equals(note.id))
+        .build();
+    final updatedImgs = q2.find();
+    q2.close();
+    if (updatedImgs.isNotEmpty && updatedImgs.every((i) => i.ocrProcessed)) {
+      await _runEmbeddingsForNote(note);
+    }
+  }
+
+  int _sumOcrBlocksForImages(List<NoteImage> images) {
+    int total = 0;
+    for (final img in images) {
+      final q = widget.db.ocrBlockBox
+          .query(OcrBlock_.image.equals(img.id))
+          .build();
+      total += q.count();
+      q.close();
+    }
+    return total;
   }
 
   void _openEditorNew() {
@@ -77,6 +160,14 @@ class _AppShellState extends State<_AppShell> {
   void _openCaptured(NoteRecord note) {
     setState(() {
       _viewingNote = note;
+      _viewingImages.clear();
+      final q = widget.db.noteImageBox
+          .query(NoteImage_.note.equals(note.id))
+          .order(NoteImage_.createdAt)
+          .build();
+      _viewingImages.addAll(q.find());
+      q.close();
+      _currentImageIndex = 0;
     });
   }
 
@@ -93,7 +184,6 @@ class _AppShellState extends State<_AppShell> {
         title: newTitle,
         course: note.course,
         textContent: note.textContent,
-        imageBytes: note.imageBytes,
         createdAt: note.createdAt,
         updatedAt: DateTime.now(),
         ocrProcessed: note.ocrProcessed,
@@ -116,7 +206,6 @@ class _AppShellState extends State<_AppShell> {
         title: note.title,
         course: newCourse,
         textContent: note.textContent,
-        imageBytes: note.imageBytes,
         createdAt: note.createdAt,
         updatedAt: DateTime.now(),
         ocrProcessed: note.ocrProcessed,
@@ -145,31 +234,91 @@ class _AppShellState extends State<_AppShell> {
   Widget _buildContent() {
     if (activeTab == ActiveTab.myNotes && isCapturingNote) {
       return NoteCapturePage(
-        onSave: (bytes, title, course, text) {
+        onSave: (images, title, course, text) {
           final note = NoteRecord(
             title: title,
             course: course,
             textContent: text,
-            imageBytes: bytes,
           );
           widget.db.noteBox.put(note);
+          final createdImages = <NoteImage>[];
+          for (final Uint8List imgBytes in images) {
+            final img = NoteImage(imageBytes: imgBytes);
+            img.note.target = note;
+            widget.db.noteImageBox.put(img);
+            createdImages.add(img);
+          }
           setState(() {
             _notes.insert(0, note);
             isCapturingNote = false;
           });
+          // Trigger OCR in background if we have an image
+          if (createdImages.isNotEmpty) {
+            for (final img in createdImages) {
+              _runOcrForImage(img);
+            }
+          }
         },
         onCancel: _cancelCapture,
       );
     }
     if (activeTab == ActiveTab.myNotes && _viewingNote != null) {
+      final note = _viewingNote!;
+      // Load images for viewer
+      final q = widget.db.noteImageBox
+          .query(NoteImage_.note.equals(note.id))
+          .order(NoteImage_.createdAt)
+          .build();
+      _viewingImages
+        ..clear()
+        ..addAll(q.find());
+      q.close();
+      final totalBlocks = _sumOcrBlocksForImages(_viewingImages);
+      final hasProcessing = _viewingImages.any(
+        (img) => _ocrInProgress.contains(img.id),
+      );
+      final hasFailed = _viewingImages.any(
+        (img) => _ocrFailed.contains(img.id),
+      );
       return NotePhotoViewPage(
-        note: _viewingNote!,
+        note: note,
         onBack: _closeCaptured,
         onRename: _renameCaptured,
         onUpdateCourse: _updateCourse,
         onDelete: (note) {
           _deleteCaptured(note);
         },
+        isOcrProcessing: hasProcessing,
+        isOcrFailed: hasFailed,
+        ocrBlockCount: totalBlocks,
+        onRetryOcr: () => _runOcrForPendingImages(note),
+        images: _viewingImages,
+        currentIndex: _currentImageIndex,
+        onAddImages: (imgs) => _addImagesToNote(note, imgs),
+        onDeleteCurrentImage: _viewingImages.isEmpty
+            ? null
+            : () => _deleteImage(_viewingImages[_currentImageIndex]),
+        isEmbProcessing: _embInProgress.contains(note.id),
+        isEmbFailed: _embFailed.contains(note.id),
+        embChunkCount: _countTextChunks(note.id),
+        onRetryEmbeddings: () => _runEmbeddingsForNote(note),
+        onPrevImage: _viewingImages.length > 1
+            ? () {
+                setState(() {
+                  _currentImageIndex =
+                      (_currentImageIndex - 1 + _viewingImages.length) %
+                      _viewingImages.length;
+                });
+              }
+            : null,
+        onNextImage: _viewingImages.length > 1
+            ? () {
+                setState(() {
+                  _currentImageIndex =
+                      (_currentImageIndex + 1) % _viewingImages.length;
+                });
+              }
+            : null,
       );
     }
     switch (activeTab) {
@@ -189,6 +338,190 @@ class _AppShellState extends State<_AppShell> {
       case ActiveTab.profile:
         return const ProfilePage();
     }
+  }
+
+  // Methods for OCR and embedding processing
+
+  int _countTextChunks(int noteId) {
+    final q = widget.db.textChunkBox
+        .query(TextChunk_.note.equals(noteId))
+        .build();
+    final c = q.count();
+    q.close();
+    return c;
+  }
+
+  void _clearEmbeddingsForNote(NoteRecord note) {
+    final q = widget.db.textChunkBox
+        .query(TextChunk_.note.equals(note.id))
+        .build();
+    final chunks = q.find();
+    q.close();
+    if (chunks.isNotEmpty) {
+      widget.db.textChunkBox.removeMany(chunks.map((e) => e.id).toList());
+    }
+    final updated = NoteRecord(
+      title: note.title,
+      course: note.course,
+      textContent: note.textContent,
+      createdAt: note.createdAt,
+      updatedAt: DateTime.now(),
+      ocrProcessed: note.ocrProcessed,
+      embeddingProcessed: false,
+    )..id = note.id;
+    widget.db.noteBox.put(updated);
+    final idx = _notes.indexWhere((n) => n.id == note.id);
+    if (idx != -1) _notes[idx] = updated;
+    if (_viewingNote?.id == note.id) _viewingNote = updated;
+  }
+
+  static List<int> _quadToInts(Uint8List quadBytes) {
+    final bd = quadBytes.buffer.asByteData(
+      quadBytes.offsetInBytes,
+      quadBytes.lengthInBytes,
+    );
+    final len = quadBytes.lengthInBytes ~/ 4;
+    final out = <int>[];
+    for (int i = 0; i < len; i++) {
+      out.add(bd.getInt32(i * 4, Endian.host));
+    }
+    return out;
+  }
+
+  static int _minY(List<int> q) =>
+      [q[1], q[3], q[5], q[7]].reduce((a, b) => a < b ? a : b);
+  static int _minX(List<int> q) =>
+      [q[0], q[2], q[4], q[6]].reduce((a, b) => a < b ? a : b);
+
+  Future<void> _runEmbeddingsForNote(NoteRecord note) async {
+    try {
+      _embFailed.remove(note.id);
+      _embInProgress.add(note.id);
+      setState(() {});
+      // Build concatenated text from all images' OCR blocks
+      final qImgs = widget.db.noteImageBox
+          .query(NoteImage_.note.equals(note.id))
+          .order(NoteImage_.createdAt)
+          .build();
+      final imgs = qImgs.find();
+      qImgs.close();
+      final buffer = StringBuffer();
+      for (final img in imgs) {
+        final qBlocks = widget.db.ocrBlockBox
+            .query(OcrBlock_.image.equals(img.id))
+            .build();
+        final blocks = qBlocks.find();
+        qBlocks.close();
+        blocks.sort((a, b) {
+          final qa = _quadToInts(a.quad);
+          final qb = _quadToInts(b.quad);
+          final ay = _minY(qa), by = _minY(qb);
+          if (ay != by) return ay.compareTo(by);
+          final ax = _minX(qa), bx = _minX(qb);
+          return ax.compareTo(bx);
+        });
+        for (final b in blocks) {
+          final t = b.text.trim();
+          if (t.isNotEmpty) buffer.writeln(t);
+        }
+        buffer.writeln();
+      }
+      final fullText = buffer.toString().trim();
+      if (fullText.isEmpty) {
+        _embFailed.add(note.id);
+        return;
+      }
+      final svc = EmbeddingService(baseUrl: Env.embeddingUrl);
+      final pairs = await svc.chunkAndEmbed(fullText);
+      // Clear old embeddings and save new
+      _clearEmbeddingsForNote(note);
+      for (final p in pairs) {
+        final chunk = TextChunk(chunkText: p.chunkText, embedding: p.vector)
+          ..note.target = note;
+        widget.db.textChunkBox.put(chunk);
+      }
+      final updated = NoteRecord(
+        title: note.title,
+        course: note.course,
+        textContent: note.textContent,
+        createdAt: note.createdAt,
+        updatedAt: DateTime.now(),
+        ocrProcessed: note.ocrProcessed,
+        embeddingProcessed: true,
+      )..id = note.id;
+      widget.db.noteBox.put(updated);
+      final idx = _notes.indexWhere((n) => n.id == note.id);
+      if (idx != -1) _notes[idx] = updated;
+      if (_viewingNote?.id == note.id) _viewingNote = updated;
+    } catch (e) {
+      print('Embeddings failed: $e');
+      _embFailed.add(note.id);
+    } finally {
+      _embInProgress.remove(note.id);
+      setState(() {});
+    }
+  }
+
+  Future<void> _addImagesToNote(NoteRecord note, List<Uint8List> images) async {
+    if (images.isEmpty) return;
+    final created = <NoteImage>[];
+    for (final imgBytes in images) {
+      final img = NoteImage(imageBytes: imgBytes)..note.target = note;
+      widget.db.noteImageBox.put(img);
+      created.add(img);
+    }
+    if (_viewingNote?.id == note.id) {
+      final q = widget.db.noteImageBox
+          .query(NoteImage_.note.equals(note.id))
+          .order(NoteImage_.createdAt)
+          .build();
+      _viewingImages
+        ..clear()
+        ..addAll(q.find());
+      q.close();
+      setState(() {});
+    }
+    for (final img in created) {
+      await _runOcrForImage(img);
+    }
+  }
+
+  Future<void> _deleteImage(NoteImage image) async {
+    final qb = widget.db.ocrBlockBox
+        .query(OcrBlock_.image.equals(image.id))
+        .build();
+    final blocks = qb.find();
+    qb.close();
+    if (blocks.isNotEmpty) {
+      widget.db.ocrBlockBox.removeMany(blocks.map((e) => e.id).toList());
+    }
+    // Remove the image itself
+    final parentNote = image.note.target;
+    widget.db.noteImageBox.remove(image.id);
+    _ocrFailed.remove(image.id);
+    _ocrInProgress.remove(image.id);
+    _viewingImages.removeWhere((img) => img.id == image.id);
+    if (_currentImageIndex >= _viewingImages.length &&
+        _viewingImages.isNotEmpty) {
+      _currentImageIndex = _viewingImages.length - 1;
+    }
+    // Invalidate embeddings for the note and recompute if applicable
+    if (parentNote != null) {
+      // Clear existing embeddings
+      _clearEmbeddingsForNote(parentNote);
+      // If there are still images and all are OCR processed, re-run embeddings
+      final qImgs = widget.db.noteImageBox
+          .query(NoteImage_.note.equals(parentNote.id))
+          .build();
+      final remaining = qImgs.find();
+      qImgs.close();
+      if (remaining.isNotEmpty && remaining.every((i) => i.ocrProcessed)) {
+        // Fire and forget; UI will update on completion
+        // ignore: unawaited_futures
+        _runEmbeddingsForNote(parentNote);
+      }
+    }
+    setState(() {});
   }
 
   @override

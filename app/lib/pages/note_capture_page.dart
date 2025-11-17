@@ -1,15 +1,13 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_selector/file_selector.dart' as fs;
 import '../theme.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
-import 'dart:convert';
 
 class NoteCapturePage extends StatefulWidget {
   final void Function(
-    Uint8List? imageBytes,
+    List<Uint8List> imageBytesList,
     String title,
     String course,
     String? text,
@@ -28,7 +26,7 @@ class NoteCapturePage extends StatefulWidget {
 
 class _NoteCapturePageState extends State<NoteCapturePage> {
   final ImagePicker _picker = ImagePicker();
-  Uint8List? _imageBytes;
+  final List<Uint8List> _images = [];
   bool _isPicking = false;
   final TextEditingController _titleController = TextEditingController(
     text: '',
@@ -59,7 +57,23 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
       if (file != null) {
         final bytes = await file.readAsBytes();
         setState(() {
-          _imageBytes = bytes;
+          _images.add(bytes);
+        });
+      }
+    } finally {
+      setState(() => _isPicking = false);
+    }
+  }
+
+  Future<void> _pickMultiFromGallery() async {
+    if (_isPicking) return;
+    setState(() => _isPicking = true);
+    try {
+      final files = await _picker.pickMultiImage(imageQuality: 90);
+      if (files.isNotEmpty) {
+        final list = await Future.wait(files.map((f) => f.readAsBytes()));
+        setState(() {
+          _images.addAll(list);
         });
       }
     } finally {
@@ -75,13 +89,13 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
         label: 'images',
         extensions: <String>['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif'],
       );
-      final fs.XFile? file = await fs.openFile(
+      final files = await fs.openFiles(
         acceptedTypeGroups: <fs.XTypeGroup>[typeGroup],
       );
-      if (file != null) {
-        final bytes = await file.readAsBytes();
+      if (files.isNotEmpty) {
+        final list = await Future.wait(files.map((f) => f.readAsBytes()));
         setState(() {
-          _imageBytes = bytes;
+          _images.addAll(list);
         });
       }
     } finally {
@@ -186,11 +200,11 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                             ? null
                             : () => _isDesktop
                                   ? _pickFromFileSystem()
-                                  : _pick(ImageSource.gallery),
+                                  : _pickMultiFromGallery(),
                         icon: const Icon(Icons.upload_file),
                         label: const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Text('Upload Image'),
+                          child: Text('Upload Image(s)'),
                         ),
                       ),
                     ),
@@ -205,17 +219,55 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   alignment: Alignment.center,
-                  child: _imageBytes == null
+                  child: _images.isEmpty
                       ? const Text(
-                          'No image selected',
+                          'No images selected',
                           style: TextStyle(color: AppTheme.textSecondary),
                         )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.memory(
-                            _imageBytes!,
-                            fit: BoxFit.contain,
-                          ),
+                      : ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _images.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            final img = _images[index];
+                            return Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.memory(
+                                    img,
+                                    height: 336,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 4,
+                                  top: 4,
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _images.removeAt(index);
+                                      });
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      padding: const EdgeInsets.all(4),
+                                      child: const Icon(
+                                        Icons.close,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                 ),
                 const SizedBox(height: 16),
@@ -241,81 +293,36 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                   children: [
                     ElevatedButton(
                       // Disable button if saving
-                      onPressed: _isSaving ? null : () async { 
-                        
-                        // Set loading state
-                        setState(() => _isSaving = true);
+                      onPressed: _isSaving
+                          ? null
+                          : () async {
+                              setState(() => _isSaving = true);
+                              try {
+                                final title =
+                                    _titleController.text.trim().isEmpty
+                                    ? (_images.isEmpty
+                                          ? 'Text Note'
+                                          : 'Photo Note')
+                                    : _titleController.text.trim();
 
-                        try {
-                          final title = _titleController.text.trim().isEmpty
-                              ? (_imageBytes == null ? 'Text Note' : 'Photo Note')
-                              : _titleController.text.trim();
-                          
-                          final manualText = _textController.text.trim().isEmpty
-                              ? null
-                              : _textController.text.trim();
+                                final manualText =
+                                    _textController.text.trim().isEmpty
+                                    ? null
+                                    : _textController.text.trim();
 
-                          String? ocrText;
-
-                          // --- 🚀 YOUR API CALL GOES HERE ---
-                          if (_imageBytes != null) {
-                            try {
-                              // Replace with your FastAPI endpoint URL
-                              var uri = Uri.parse('http://192.168.18.84:8000/ocr');
-                              var request = http.MultipartRequest('POST', uri)
-                                ..files.add(
-                                  http.MultipartFile.fromBytes(
-                                    'file', // This 'file' key must match your FastAPI endpoint
-                                    _imageBytes!,
-                                    filename: 'note_image.jpg',
-                                    contentType: MediaType('image', 'jpeg'),
-                                  ),
+                                widget.onSave(
+                                  _images,
+                                  title,
+                                  _selectedCourse,
+                                  manualText,
                                 );
-
-                              var response = await request.send();
-
-                              if (response.statusCode == 200) {
-                                final responseBody = await response.stream.bytesToString();
-                                // Assuming your API returns a JSON like: {"text": "the ocr text"}
-                                final data = jsonDecode(responseBody); 
-                                ocrText = data['text'];
-                              } else {
-                                // Handle API error (e.g., show a snackbar)
-                                print('API Error: ${response.statusCode}');
+                              } finally {
+                                setState(() => _isSaving = false);
                               }
-                            } catch (e) {
-                              // Handle network error
-                              print('Network Error: $e');
-                            }
-                          }
-                          // --- END OF API CALL ---
-
-                          // Combine manual text and OCR text
-                          String? finalTextContent = manualText;
-                          if (ocrText != null) {
-                            if (finalTextContent == null) {
-                              finalTextContent = ocrText;
-                            } else {
-                              finalTextContent = '$finalTextContent\n\n--- OCR ---\n$ocrText';
-                            }
-                          }
-
-                          // Finally, call the onSave with all the data
-                          widget.onSave(
-                            _imageBytes,
-                            title,
-                            _selectedCourse,
-                            finalTextContent, // Pass the combined text
-                          );
-
-                        } finally {
-                          // Unset loading state
-                          setState(() => _isSaving = false);
-                        }
-                      },
+                            },
                       // Show a spinner or the text
-                      child: _isSaving 
-                          ? const CircularProgressIndicator() 
+                      child: _isSaving
+                          ? const CircularProgressIndicator()
                           : const Padding(
                               padding: EdgeInsets.symmetric(
                                 horizontal: 16,

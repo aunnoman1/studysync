@@ -50,12 +50,6 @@ final _entities = <obx_int.ModelEntity>[
         flags: 0,
       ),
       obx_int.ModelProperty(
-        id: const obx_int.IdUid(5, 1034824678108998241),
-        name: 'imageBytes',
-        type: 23,
-        flags: 0,
-      ),
-      obx_int.ModelProperty(
         id: const obx_int.IdUid(6, 6757691179404252860),
         name: 'createdAt',
         type: 10,
@@ -82,14 +76,14 @@ final _entities = <obx_int.ModelEntity>[
     ],
     relations: <obx_int.ModelRelation>[
       obx_int.ModelRelation(
-        id: const obx_int.IdUid(1, 5525636473163963231),
-        name: 'ocrBlocks',
-        targetId: const obx_int.IdUid(3, 2554812963669290589),
-      ),
-      obx_int.ModelRelation(
         id: const obx_int.IdUid(2, 2812691182370582728),
         name: 'textChunks',
         targetId: const obx_int.IdUid(4, 6369069679209550495),
+      ),
+      obx_int.ModelRelation(
+        id: const obx_int.IdUid(4, 3488293991052873370),
+        name: 'images',
+        targetId: const obx_int.IdUid(5, 1983914704999987015),
       ),
     ],
     backlinks: <obx_int.ModelBacklink>[],
@@ -97,7 +91,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(3, 2554812963669290589),
     name: 'OcrBlock',
-    lastPropertyId: const obx_int.IdUid(6, 3363475017351110564),
+    lastPropertyId: const obx_int.IdUid(7, 3045192379165136083),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -105,15 +99,6 @@ final _entities = <obx_int.ModelEntity>[
         name: 'id',
         type: 6,
         flags: 1,
-      ),
-      obx_int.ModelProperty(
-        id: const obx_int.IdUid(2, 120821145252514164),
-        name: 'noteId',
-        type: 11,
-        flags: 520,
-        indexId: const obx_int.IdUid(1, 2181264681781770524),
-        relationField: 'note',
-        relationTarget: 'NoteRecord',
       ),
       obx_int.ModelProperty(
         id: const obx_int.IdUid(3, 2228320061846295229),
@@ -138,6 +123,15 @@ final _entities = <obx_int.ModelEntity>[
         name: 'quad',
         type: 23,
         flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 3045192379165136083),
+        name: 'imageId',
+        type: 11,
+        flags: 520,
+        indexId: const obx_int.IdUid(5, 6217677094220620847),
+        relationField: 'image',
+        relationTarget: 'NoteImage',
       ),
     ],
     relations: <obx_int.ModelRelation>[],
@@ -188,6 +182,55 @@ final _entities = <obx_int.ModelEntity>[
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[],
   ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(5, 1983914704999987015),
+    name: 'NoteImage',
+    lastPropertyId: const obx_int.IdUid(5, 3387588151804127568),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 3976653792929027893),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 4942268625454470670),
+        name: 'noteId',
+        type: 11,
+        flags: 520,
+        indexId: const obx_int.IdUid(4, 3322297880123125818),
+        relationField: 'note',
+        relationTarget: 'NoteRecord',
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 143846603189572906),
+        name: 'imageBytes',
+        type: 23,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 8855701926809797678),
+        name: 'createdAt',
+        type: 10,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 3387588151804127568),
+        name: 'ocrProcessed',
+        type: 1,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[
+      obx_int.ModelRelation(
+        id: const obx_int.IdUid(3, 3000095889394809020),
+        name: 'ocrBlocks',
+        targetId: const obx_int.IdUid(3, 2554812963669290589),
+      ),
+    ],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
 ];
 
 /// Shortcut for [obx.Store.new] that passes [getObjectBoxModel] and for Flutter
@@ -228,12 +271,12 @@ Future<obx.Store> openStore({
 obx_int.ModelDefinition getObjectBoxModel() {
   final model = obx_int.ModelInfo(
     entities: _entities,
-    lastEntityId: const obx_int.IdUid(4, 6369069679209550495),
-    lastIndexId: const obx_int.IdUid(3, 2725544423793281334),
-    lastRelationId: const obx_int.IdUid(2, 2812691182370582728),
+    lastEntityId: const obx_int.IdUid(5, 1983914704999987015),
+    lastIndexId: const obx_int.IdUid(5, 6217677094220620847),
+    lastRelationId: const obx_int.IdUid(4, 3488293991052873370),
     lastSequenceId: const obx_int.IdUid(0, 0),
     retiredEntityUids: const [1407255643202042497],
-    retiredIndexUids: const [],
+    retiredIndexUids: const [2181264681781770524],
     retiredPropertyUids: const [
       1101611934885520711,
       9031447168788706071,
@@ -241,8 +284,10 @@ obx_int.ModelDefinition getObjectBoxModel() {
       8554364282912279380,
       73526378004897827,
       9123639503545899433,
+      1034824678108998241,
+      120821145252514164,
     ],
-    retiredRelationUids: const [],
+    retiredRelationUids: const [5525636473163963231],
     modelVersion: 5,
     modelVersionParserMinimum: 5,
     version: 1,
@@ -253,8 +298,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
       model: _entities[0],
       toOneRelations: (NoteRecord object) => [],
       toManyRelations: (NoteRecord object) => {
-        obx_int.RelInfo<NoteRecord>.toMany(1, object.id): object.ocrBlocks,
         obx_int.RelInfo<NoteRecord>.toMany(2, object.id): object.textChunks,
+        obx_int.RelInfo<NoteRecord>.toMany(4, object.id): object.images,
       },
       getId: (NoteRecord object) => object.id,
       setId: (NoteRecord object, int id) {
@@ -266,15 +311,11 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final textContentOffset = object.textContent == null
             ? null
             : fbb.writeString(object.textContent!);
-        final imageBytesOffset = object.imageBytes == null
-            ? null
-            : fbb.writeListInt8(object.imageBytes!);
         fbb.startTable(10);
         fbb.addInt64(0, object.id);
         fbb.addOffset(1, titleOffset);
         fbb.addOffset(2, courseOffset);
         fbb.addOffset(3, textContentOffset);
-        fbb.addOffset(4, imageBytesOffset);
         fbb.addInt64(5, object.createdAt.millisecondsSinceEpoch);
         fbb.addInt64(6, object.updatedAt.millisecondsSinceEpoch);
         fbb.addBool(7, object.ocrProcessed);
@@ -294,11 +335,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final textContentParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGetNullable(buffer, rootOffset, 10);
-        final imageBytesParam =
-            const fb.Uint8ListReader(
-                  lazy: false,
-                ).vTableGetNullable(buffer, rootOffset, 12)
-                as Uint8List?;
         final createdAtParam = DateTime.fromMillisecondsSinceEpoch(
           const fb.Int64Reader().vTableGet(buffer, rootOffset, 14, 0),
         );
@@ -321,28 +357,27 @@ obx_int.ModelDefinition getObjectBoxModel() {
           title: titleParam,
           course: courseParam,
           textContent: textContentParam,
-          imageBytes: imageBytesParam,
           createdAt: createdAtParam,
           updatedAt: updatedAtParam,
           ocrProcessed: ocrProcessedParam,
           embeddingProcessed: embeddingProcessedParam,
         )..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
         obx_int.InternalToManyAccess.setRelInfo<NoteRecord>(
-          object.ocrBlocks,
-          store,
-          obx_int.RelInfo<NoteRecord>.toMany(1, object.id),
-        );
-        obx_int.InternalToManyAccess.setRelInfo<NoteRecord>(
           object.textChunks,
           store,
           obx_int.RelInfo<NoteRecord>.toMany(2, object.id),
+        );
+        obx_int.InternalToManyAccess.setRelInfo<NoteRecord>(
+          object.images,
+          store,
+          obx_int.RelInfo<NoteRecord>.toMany(4, object.id),
         );
         return object;
       },
     ),
     OcrBlock: obx_int.EntityDefinition<OcrBlock>(
       model: _entities[1],
-      toOneRelations: (OcrBlock object) => [object.note],
+      toOneRelations: (OcrBlock object) => [object.image],
       toManyRelations: (OcrBlock object) => {},
       getId: (OcrBlock object) => object.id,
       setId: (OcrBlock object, int id) {
@@ -351,13 +386,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
       objectToFB: (OcrBlock object, fb.Builder fbb) {
         final textOffset = fbb.writeString(object.text);
         final quadOffset = fbb.writeListInt8(object.quad);
-        fbb.startTable(7);
+        fbb.startTable(8);
         fbb.addInt64(0, object.id);
-        fbb.addInt64(1, object.note.targetId);
         fbb.addOffset(2, textOffset);
         fbb.addInt64(3, object.page);
         fbb.addInt64(4, object.readingOrder);
         fbb.addOffset(5, quadOffset);
+        fbb.addInt64(6, object.image.targetId);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -390,13 +425,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
           page: pageParam,
           readingOrder: readingOrderParam,
         )..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
-        object.note.targetId = const fb.Int64Reader().vTableGet(
+        object.image.targetId = const fb.Int64Reader().vTableGet(
           buffer,
           rootOffset,
-          6,
+          16,
           0,
         );
-        object.note.attach(store);
+        object.image.attach(store);
         return object;
       },
     ),
@@ -453,6 +488,64 @@ obx_int.ModelDefinition getObjectBoxModel() {
         return object;
       },
     ),
+    NoteImage: obx_int.EntityDefinition<NoteImage>(
+      model: _entities[3],
+      toOneRelations: (NoteImage object) => [object.note],
+      toManyRelations: (NoteImage object) => {
+        obx_int.RelInfo<NoteImage>.toMany(3, object.id): object.ocrBlocks,
+      },
+      getId: (NoteImage object) => object.id,
+      setId: (NoteImage object, int id) {
+        object.id = id;
+      },
+      objectToFB: (NoteImage object, fb.Builder fbb) {
+        final imageBytesOffset = fbb.writeListInt8(object.imageBytes);
+        fbb.startTable(6);
+        fbb.addInt64(0, object.id);
+        fbb.addInt64(1, object.note.targetId);
+        fbb.addOffset(2, imageBytesOffset);
+        fbb.addInt64(3, object.createdAt.millisecondsSinceEpoch);
+        fbb.addBool(4, object.ocrProcessed);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final imageBytesParam =
+            const fb.Uint8ListReader(
+                  lazy: false,
+                ).vTableGet(buffer, rootOffset, 8, Uint8List(0))
+                as Uint8List;
+        final createdAtParam = DateTime.fromMillisecondsSinceEpoch(
+          const fb.Int64Reader().vTableGet(buffer, rootOffset, 10, 0),
+        );
+        final ocrProcessedParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          12,
+          false,
+        );
+        final object = NoteImage(
+          imageBytes: imageBytesParam,
+          createdAt: createdAtParam,
+          ocrProcessed: ocrProcessedParam,
+        )..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
+        object.note.targetId = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          6,
+          0,
+        );
+        object.note.attach(store);
+        obx_int.InternalToManyAccess.setRelInfo<NoteImage>(
+          object.ocrBlocks,
+          store,
+          obx_int.RelInfo<NoteImage>.toMany(3, object.id),
+        );
+        return object;
+      },
+    ),
   };
 
   return obx_int.ModelDefinition(model, bindings);
@@ -480,38 +573,33 @@ class NoteRecord_ {
     _entities[0].properties[3],
   );
 
-  /// See [NoteRecord.imageBytes].
-  static final imageBytes = obx.QueryByteVectorProperty<NoteRecord>(
-    _entities[0].properties[4],
-  );
-
   /// See [NoteRecord.createdAt].
   static final createdAt = obx.QueryDateProperty<NoteRecord>(
-    _entities[0].properties[5],
+    _entities[0].properties[4],
   );
 
   /// See [NoteRecord.updatedAt].
   static final updatedAt = obx.QueryDateProperty<NoteRecord>(
-    _entities[0].properties[6],
+    _entities[0].properties[5],
   );
 
   /// See [NoteRecord.ocrProcessed].
   static final ocrProcessed = obx.QueryBooleanProperty<NoteRecord>(
-    _entities[0].properties[7],
+    _entities[0].properties[6],
   );
 
   /// See [NoteRecord.embeddingProcessed].
   static final embeddingProcessed = obx.QueryBooleanProperty<NoteRecord>(
-    _entities[0].properties[8],
-  );
-
-  /// see [NoteRecord.ocrBlocks]
-  static final ocrBlocks = obx.QueryRelationToMany<NoteRecord, OcrBlock>(
-    _entities[0].relations[0],
+    _entities[0].properties[7],
   );
 
   /// see [NoteRecord.textChunks]
   static final textChunks = obx.QueryRelationToMany<NoteRecord, TextChunk>(
+    _entities[0].relations[0],
+  );
+
+  /// see [NoteRecord.images]
+  static final images = obx.QueryRelationToMany<NoteRecord, NoteImage>(
     _entities[0].relations[1],
   );
 }
@@ -523,28 +611,28 @@ class OcrBlock_ {
     _entities[1].properties[0],
   );
 
-  /// See [OcrBlock.note].
-  static final note = obx.QueryRelationToOne<OcrBlock, NoteRecord>(
-    _entities[1].properties[1],
-  );
-
   /// See [OcrBlock.text].
   static final text = obx.QueryStringProperty<OcrBlock>(
-    _entities[1].properties[2],
+    _entities[1].properties[1],
   );
 
   /// See [OcrBlock.page].
   static final page = obx.QueryIntegerProperty<OcrBlock>(
-    _entities[1].properties[3],
+    _entities[1].properties[2],
   );
 
   /// See [OcrBlock.readingOrder].
   static final readingOrder = obx.QueryIntegerProperty<OcrBlock>(
-    _entities[1].properties[4],
+    _entities[1].properties[3],
   );
 
   /// See [OcrBlock.quad].
   static final quad = obx.QueryByteVectorProperty<OcrBlock>(
+    _entities[1].properties[4],
+  );
+
+  /// See [OcrBlock.image].
+  static final image = obx.QueryRelationToOne<OcrBlock, NoteImage>(
     _entities[1].properties[5],
   );
 }
@@ -574,5 +662,38 @@ class TextChunk_ {
   /// See [TextChunk.orderIndex].
   static final orderIndex = obx.QueryIntegerProperty<TextChunk>(
     _entities[2].properties[4],
+  );
+}
+
+/// [NoteImage] entity fields to define ObjectBox queries.
+class NoteImage_ {
+  /// See [NoteImage.id].
+  static final id = obx.QueryIntegerProperty<NoteImage>(
+    _entities[3].properties[0],
+  );
+
+  /// See [NoteImage.note].
+  static final note = obx.QueryRelationToOne<NoteImage, NoteRecord>(
+    _entities[3].properties[1],
+  );
+
+  /// See [NoteImage.imageBytes].
+  static final imageBytes = obx.QueryByteVectorProperty<NoteImage>(
+    _entities[3].properties[2],
+  );
+
+  /// See [NoteImage.createdAt].
+  static final createdAt = obx.QueryDateProperty<NoteImage>(
+    _entities[3].properties[3],
+  );
+
+  /// See [NoteImage.ocrProcessed].
+  static final ocrProcessed = obx.QueryBooleanProperty<NoteImage>(
+    _entities[3].properties[4],
+  );
+
+  /// see [NoteImage.ocrBlocks]
+  static final ocrBlocks = obx.QueryRelationToMany<NoteImage, OcrBlock>(
+    _entities[3].relations[0],
   );
 }

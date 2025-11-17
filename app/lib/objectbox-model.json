@@ -30,11 +30,6 @@
           "type": 9
         },
         {
-          "id": "5:1034824678108998241",
-          "name": "imageBytes",
-          "type": 23
-        },
-        {
           "id": "6:6757691179404252860",
           "name": "createdAt",
           "type": 10
@@ -57,20 +52,20 @@
       ],
       "relations": [
         {
-          "id": "1:5525636473163963231",
-          "name": "ocrBlocks",
-          "targetId": "3:2554812963669290589"
-        },
-        {
           "id": "2:2812691182370582728",
           "name": "textChunks",
           "targetId": "4:6369069679209550495"
+        },
+        {
+          "id": "4:3488293991052873370",
+          "name": "images",
+          "targetId": "5:1983914704999987015"
         }
       ]
     },
     {
       "id": "3:2554812963669290589",
-      "lastPropertyId": "6:3363475017351110564",
+      "lastPropertyId": "7:3045192379165136083",
       "name": "OcrBlock",
       "properties": [
         {
@@ -78,14 +73,6 @@
           "name": "id",
           "type": 6,
           "flags": 1
-        },
-        {
-          "id": "2:120821145252514164",
-          "name": "noteId",
-          "indexId": "1:2181264681781770524",
-          "type": 11,
-          "flags": 520,
-          "relationTarget": "NoteRecord"
         },
         {
           "id": "3:2228320061846295229",
@@ -106,6 +93,14 @@
           "id": "6:3363475017351110564",
           "name": "quad",
           "type": 23
+        },
+        {
+          "id": "7:3045192379165136083",
+          "name": "imageId",
+          "indexId": "5:6217677094220620847",
+          "type": 11,
+          "flags": 520,
+          "relationTarget": "NoteImage"
         }
       ],
       "relations": []
@@ -148,26 +143,75 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "5:1983914704999987015",
+      "lastPropertyId": "5:3387588151804127568",
+      "name": "NoteImage",
+      "properties": [
+        {
+          "id": "1:3976653792929027893",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:4942268625454470670",
+          "name": "noteId",
+          "indexId": "4:3322297880123125818",
+          "type": 11,
+          "flags": 520,
+          "relationTarget": "NoteRecord"
+        },
+        {
+          "id": "3:143846603189572906",
+          "name": "imageBytes",
+          "type": 23
+        },
+        {
+          "id": "4:8855701926809797678",
+          "name": "createdAt",
+          "type": 10
+        },
+        {
+          "id": "5:3387588151804127568",
+          "name": "ocrProcessed",
+          "type": 1
+        }
+      ],
+      "relations": [
+        {
+          "id": "3:3000095889394809020",
+          "name": "ocrBlocks",
+          "targetId": "3:2554812963669290589"
+        }
+      ]
     }
   ],
-  "lastEntityId": "4:6369069679209550495",
-  "lastIndexId": "3:2725544423793281334",
-  "lastRelationId": "2:2812691182370582728",
+  "lastEntityId": "5:1983914704999987015",
+  "lastIndexId": "5:6217677094220620847",
+  "lastRelationId": "4:3488293991052873370",
   "lastSequenceId": "0:0",
   "modelVersion": 5,
   "modelVersionParserMinimum": 5,
   "retiredEntityUids": [
     1407255643202042497
   ],
-  "retiredIndexUids": [],
+  "retiredIndexUids": [
+    2181264681781770524
+  ],
   "retiredPropertyUids": [
     1101611934885520711,
     9031447168788706071,
     4804992250534136546,
     8554364282912279380,
     73526378004897827,
-    9123639503545899433
+    9123639503545899433,
+    1034824678108998241,
+    120821145252514164
   ],
-  "retiredRelationUids": [],
+  "retiredRelationUids": [
+    5525636473163963231
+  ],
   "version": 1
 }

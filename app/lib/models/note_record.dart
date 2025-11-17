@@ -13,10 +13,6 @@ class NoteRecord {
   /// Optional, manually written content by the user.
   String? textContent;
 
-  /// Optional raw image bytes of the note (e.g., captured/uploaded photo).
-  @Property(type: PropertyType.byteVector)
-  Uint8List? imageBytes;
-
   @Property(type: PropertyType.date)
   DateTime createdAt;
 
@@ -31,20 +27,45 @@ class NoteRecord {
   bool embeddingProcessed;
 
   /// Relations
-  final ocrBlocks = ToMany<OcrBlock>();
+  final images = ToMany<NoteImage>();
   final textChunks = ToMany<TextChunk>();
 
   NoteRecord({
     required this.title,
     required this.course,
     this.textContent,
-    this.imageBytes,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.ocrProcessed = false,
     this.embeddingProcessed = false,
   }) : createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now();
+}
+
+/// A single page/image in a note.
+@Entity()
+class NoteImage {
+  @Id()
+  int id = 0;
+
+  final note = ToOne<NoteRecord>();
+
+  @Property(type: PropertyType.byteVector)
+  Uint8List imageBytes;
+
+  @Property(type: PropertyType.date)
+  DateTime createdAt;
+
+  /// Whether OCR is processed for this image.
+  bool ocrProcessed;
+
+  final ocrBlocks = ToMany<OcrBlock>();
+
+  NoteImage({
+    required this.imageBytes,
+    DateTime? createdAt,
+    this.ocrProcessed = false,
+  }) : createdAt = createdAt ?? DateTime.now();
 }
 
 /// OCR detection block. Represents a detected text region with quadrilateral
@@ -54,8 +75,8 @@ class OcrBlock {
   @Id()
   int id = 0;
 
-  /// Back-link to owning note.
-  final note = ToOne<NoteRecord>();
+  /// Back-link to owning image/page.
+  final image = ToOne<NoteImage>();
 
   /// The raw text detected in this block.
   String text;

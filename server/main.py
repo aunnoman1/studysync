@@ -1,6 +1,12 @@
 import io
 import re  # <-- 1. ADDED IMPORT
 from contextlib import asynccontextmanager
+import os
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except Exception:
+    pass
 import torch
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -24,15 +30,15 @@ async def lifespan(app: FastAPI):
     """
     global processor, model
     print(f"--- Loading model on device: {device} with dtype: {model_dtype} ---")
-    
-    model_id = "microsoft/kosmos-2.5"
-    processor = AutoProcessor.from_pretrained(model_id)
+
+    local_model_path = "./models/ocr"
+    processor = AutoProcessor.from_pretrained(local_model_path)
     # 2. UPDATED MODEL LOADING WITH DTYPE
     model = AutoModelForVision2Seq.from_pretrained(
-        model_id, 
+        local_model_path,
         torch_dtype=model_dtype
     ).to(device)
-    
+
     print("--- Model loading complete ---")
     yield
     print("--- Shutting down and cleaning up model ---")
@@ -45,35 +51,81 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # 3. ADDED POST_PROCESS FUNCTION (MODIFIED FROM YOUR EXAMPLE)
-def post_process_ocr(generated_text: str, prompt: str, scale_height: float, scale_width: float) -> str:
+def post_process_ocr(generated_text: str, prompt: str, scale_height: float, scale_width: float):
     """
     Parses the structured output from Kosmos 2.5 <ocr> prompt.
-    Returns only the detected text, joined by newlines.
+    Returns a list of blocks as dicts: { 'text': str, 'quad': [x1,y1,x2,y2,x3,y3,x4,y4] }
+    Coords are scaled back to the original image pixel space using the provided scale factors.
+    Falls back to parsing CSV-like lines if no <bbox> tags are found.
     """
     # Remove the prompt from the generated text
     text = generated_text.replace(prompt, "").strip()
-    
-    # Define the regex pattern for bounding boxes
-    pattern = r"<bbox><x_\d+><y_\d+><x_\d+><y_\d+></bbox>"
-    
-    # Split the text by the bounding box pattern.
-    # The first element is usually empty, so we take [1:]
-    lines = re.split(pattern, text)[1:]
-    
-    if not lines:
-        # If no bounding boxes were found, the model might have returned
-        # plain text. Let's try to clean it.
-        if "the text is:" in text.lower():
-            text = text.split(":", 1)[-1].strip()
-        return text
 
-    # We just want the text, not the coordinates.
-    # Join all detected text lines with a newline.
-    return "\n".join(line.strip() for line in lines)
+    blocks = []
+
+    # Pattern 1: Kosmos bbox tags with 4 coordinate pairs, followed by optional text
+    # Example: <bbox><x_35><y_48><x_806><y_48><x_806><y_99><x_35><y_99></bbox>some text
+    # Accept 2-pair (x1,y1,x2,y2) OR 4-pair (x1,y1,x2,y2,x3,y3,x4,y4)
+    kosmos_pattern = re.compile(
+        r"<bbox>"
+        r"<x_(\d+)><y_(\d+)>"
+        r"<x_(\d+)><y_(\d+)>"
+        r"(?:<x_(\d+)><y_(\d+)><x_(\d+)><y_(\d+)>)?"
+        r"</bbox>\s*([^\n<]*)",
+        re.IGNORECASE,
+    )
+    for m in kosmos_pattern.finditer(text):
+        g = m.groups()
+        x1, y1, x2, y2 = map(int, g[:4])
+        # Optional additional pairs (x3,y3,x4,y4)
+        opt = g[4:8]
+        raw_label = (g[8] or "").strip()
+
+        if all(opt):
+            x3, y3, x4, y4 = map(int, opt)
+            quad = [x1, y1, x2, y2, x3, y3, x4, y4]
+        else:
+            # Build rectangle quad from two corners (x1,y1) top-left, (x2,y2) bottom-right
+            quad = [x1, y1, x2, y1, x2, y2, x1, y2]
+
+        # Scale back to original image size
+        scaled = []
+        for i, val in enumerate(quad):
+            if i % 2 == 0:
+                scaled.append(int(round(val * scale_width)))
+            else:
+                scaled.append(int(round(val * scale_height)))
+        blocks.append({"text": raw_label, "quad": scaled})
+
+    if blocks:
+        return blocks
+
+    # Pattern 2: Fallback for CSV-like lines (x1,y1,x2,y2,x3,y3,x4,y4[,text])
+    # Example: 35,48,806,48,806,99,35,99,Some text here
+    csv_lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    csv_pattern = re.compile(
+        r"^\s*(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)(?:,(.*))?$"
+    )
+    for ln in csv_lines:
+        m = csv_pattern.match(ln)
+        if not m:
+            continue
+        nums = list(map(int, m.groups()[:8]))
+        lbl = (m.group(9) or "").strip()
+        scaled = []
+        for i, val in enumerate(nums):
+            if i % 2 == 0:
+                scaled.append(int(round(val * scale_width)))
+            else:
+                scaled.append(int(round(val * scale_height)))
+        blocks.append({"text": lbl, "quad": scaled})
+
+    # If still nothing parsed, return empty list (caller can decide)
+    return blocks
 
 
 # 4. COMPLETELY REWRITTEN KOSMOS FUNCTION
-def run_kosmos_ocr(image: Image.Image) -> str:
+def run_kosmos_ocr(image: Image.Image):
     """
     This is the "blocking" function that runs the AI model.
     We run this in a threadpool to avoid blocking the main server thread.
@@ -85,12 +137,12 @@ def run_kosmos_ocr(image: Image.Image) -> str:
 
         # Process the image and prompt
         inputs = processor(text=prompt, images=image, return_tensors="pt")
-        
+
         # Get scaling factors
         # .item() converts the 0-dim tensor to a plain Python number
         height = inputs.pop("height").item()
         width = inputs.pop("width").item()
-        
+
         scale_height = raw_height / height
         scale_width = raw_width / width
 
@@ -101,28 +153,27 @@ def run_kosmos_ocr(image: Image.Image) -> str:
 
         # Generate the output
         generated_ids = model.generate(
-            **inputs, 
+            **inputs,
             max_new_tokens=1024,
             use_cache=True
         )
 
         # Decode the generated text
         generated_text = processor.batch_decode(
-            generated_ids, 
+            generated_ids,
             skip_special_tokens=True
         )[0]
-        
+
         print(f"--- RAW MODEL OUTPUT: '{generated_text}' ---")
 
         # Use the new post-processing function
-        output_text = post_process_ocr(
-            generated_text, 
-            prompt, 
-            scale_height, 
+        blocks = post_process_ocr(
+            generated_text,
+            prompt,
+            scale_height,
             scale_width
         )
-            
-        return output_text
+        return blocks
 
     except Exception as e:
         print(f"Error during model inference: {e}")
@@ -147,22 +198,20 @@ async def ocr_endpoint(file: UploadFile = File(...)):
         global last_image_bytes
         last_image_bytes = image_bytes
         # --- END OF DEBUG CODE ---
-        
+
         # Open the image using PIL
         pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
     except Exception as e:
         print(f"Error reading image: {e}")
         raise HTTPException(status_code=400, detail=f"Could not read image file: {e}")
-    
+
     try:
         # Run the blocking OCR function in a non-blocking way
         # 5. REMOVED THE "prompt" ARGUMENT AS IT'S NOW HARDCODED
-        ocr_result = await run_in_threadpool(run_kosmos_ocr, pil_image)
-        
-        # Return the successful result
-        print(f"OCR RESULT: {ocr_result}")
-        return {"text": ocr_result}
+        blocks = await run_in_threadpool(run_kosmos_ocr, pil_image)
+        print(f"OCR BLOCKS: {len(blocks)}")
+        return {"blocks": blocks}
 
     except Exception as e:
         # Handle errors that happened during the model inference
@@ -181,37 +230,37 @@ async def get_test_page():
         <head>
             <title>Test OCR Endpoint</title>
             <style>
-                body { 
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-                    margin: 40px; 
-                    background: #f0f2f5; 
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    margin: 40px;
+                    background: #f0f2f5;
                     color: #333;
                     display: grid;
                     place-items: center;
                     min-height: 80vh;
                 }
                 h1 { color: #111; }
-                div.container { 
-                    background: #ffffff; 
-                    padding: 30px; 
-                    border-radius: 12px; 
+                div.container {
+                    background: #ffffff;
+                    padding: 30px;
+                    border-radius: 12px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
                     width: 500px;
                 }
-                input[type="file"] { 
-                    margin-bottom: 20px; 
+                input[type="file"] {
+                    margin-bottom: 20px;
                     padding: 10px;
                     border: 1px solid #ddd;
                     border-radius: 6px;
                     width: 95%;
                 }
-                input[type="submit"] { 
-                    background: #007aff; 
-                    color: white; 
-                    border: none; 
-                    padding: 12px 20px; 
-                    border-radius: 6px; 
-                    cursor: pointer; 
+                input[type="submit"] {
+                    background: #007aff;
+                    color: white;
+                    border: none;
+                    padding: 12px 20px;
+                    border-radius: 6px;
+                    cursor: pointer;
                     font-size: 16px;
                     font-weight: 500;
                 }
@@ -222,7 +271,7 @@ async def get_test_page():
             <div class="container">
                 <h1>Test Kosmos 2.5 OCR</h1>
                 <p>Select an image to upload and test the /ocr endpoint.</p>
-                <!-- 
+                <!--
                 This form POSTs to your /ocr endpoint,
                 using multipart/form-data (required for files).
                 The input name "file" matches your endpoint's parameter.
@@ -248,7 +297,7 @@ async def get_last_image():
     global last_image_bytes
     if last_image_bytes is None:
         raise HTTPException(status_code=404, detail="No image has been processed yet.")
-    
+
     # We assume the Flutter app sent a JPEG, as per our previous fix.
     return Response(content=last_image_bytes, media_type="image/jpeg")
 
@@ -256,5 +305,8 @@ async def get_last_image():
 async def root():
     return {"message": "OCR server is running. POST images to /ocr or go to /test to upload. Go to /view-last-image to see the last uploaded image."}
 
-# To run this app, save it as main.py and run:
-# uvicorn main:app --reload --host 0.0.0.loc
+if __name__ == "__main__":
+    import uvicorn
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("main:app", host=host, port=port, reload=True)

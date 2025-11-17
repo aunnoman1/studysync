@@ -51,6 +51,8 @@ class _AppShellState extends State<_AppShell> {
   bool isCapturingNote = false;
   final List<NoteRecord> _notes = [];
   NoteRecord? _viewingNote;
+  final List<NoteImage> _viewingImages = [];
+  int _currentImageIndex = 0;
   final Set<int> _ocrInProgress = <int>{};
   final Set<int> _ocrFailed = <int>{};
 
@@ -61,6 +63,56 @@ class _AppShellState extends State<_AppShell> {
     final loaded = widget.db.noteBox.getAll();
     loaded.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _notes.addAll(loaded);
+  }
+
+  Future<void> _runOcrForImage(NoteImage image) async {
+    try {
+      _ocrFailed.remove(image.id);
+      _ocrInProgress.add(image.id);
+      setState(() {});
+      final ocr = OcrService(baseUrl: 'http://localhost:8000');
+      final blocks = await ocr.detect(image.imageBytes);
+      for (final b in blocks) {
+        final quadI32 = Int32List.fromList(b.quad);
+        final quadBytes = quadI32.buffer.asUint8List();
+        final ob = OcrBlock(text: b.text, quad: quadBytes);
+        ob.image.target = image;
+        widget.db.ocrBlockBox.put(ob);
+      }
+      image.ocrProcessed = true;
+      widget.db.noteImageBox.put(image);
+    } catch (e) {
+      print('OCR failed: $e');
+      _ocrFailed.add(image.id);
+    } finally {
+      _ocrInProgress.remove(image.id);
+      setState(() {});
+    }
+  }
+
+  Future<void> _runOcrForPendingImages(NoteRecord note) async {
+    final q = widget.db.noteImageBox
+        .query(NoteImage_.note.equals(note.id))
+        .build();
+    final imgs = q.find();
+    q.close();
+    for (final img in imgs) {
+      if (!img.ocrProcessed) {
+        await _runOcrForImage(img);
+      }
+    }
+  }
+
+  int _sumOcrBlocksForImages(List<NoteImage> images) {
+    int total = 0;
+    for (final img in images) {
+      final q = widget.db.ocrBlockBox
+          .query(OcrBlock_.image.equals(img.id))
+          .build();
+      total += q.count();
+      q.close();
+    }
+    return total;
   }
 
   void _openEditorNew() {
@@ -82,6 +134,14 @@ class _AppShellState extends State<_AppShell> {
   void _openCaptured(NoteRecord note) {
     setState(() {
       _viewingNote = note;
+      _viewingImages.clear();
+      final q = widget.db.noteImageBox
+          .query(NoteImage_.note.equals(note.id))
+          .order(NoteImage_.createdAt)
+          .build();
+      _viewingImages.addAll(q.find());
+      q.close();
+      _currentImageIndex = 0;
     });
   }
 
@@ -98,7 +158,6 @@ class _AppShellState extends State<_AppShell> {
         title: newTitle,
         course: note.course,
         textContent: note.textContent,
-        imageBytes: note.imageBytes,
         createdAt: note.createdAt,
         updatedAt: DateTime.now(),
         ocrProcessed: note.ocrProcessed,
@@ -121,7 +180,6 @@ class _AppShellState extends State<_AppShell> {
         title: note.title,
         course: newCourse,
         textContent: note.textContent,
-        imageBytes: note.imageBytes,
         createdAt: note.createdAt,
         updatedAt: DateTime.now(),
         ocrProcessed: note.ocrProcessed,
@@ -150,21 +208,29 @@ class _AppShellState extends State<_AppShell> {
   Widget _buildContent() {
     if (activeTab == ActiveTab.myNotes && isCapturingNote) {
       return NoteCapturePage(
-        onSave: (bytes, title, course, text) {
+        onSave: (images, title, course, text) {
           final note = NoteRecord(
             title: title,
             course: course,
             textContent: text,
-            imageBytes: bytes,
           );
           widget.db.noteBox.put(note);
+          final createdImages = <NoteImage>[];
+          for (final Uint8List imgBytes in images) {
+            final img = NoteImage(imageBytes: imgBytes);
+            img.note.target = note;
+            widget.db.noteImageBox.put(img);
+            createdImages.add(img);
+          }
           setState(() {
             _notes.insert(0, note);
             isCapturingNote = false;
           });
           // Trigger OCR in background if we have an image
-          if (bytes != null && bytes.isNotEmpty) {
-            _runOcrForNote(note, bytes);
+          if (createdImages.isNotEmpty) {
+            for (final img in createdImages) {
+              _runOcrForImage(img);
+            }
           }
         },
         onCancel: _cancelCapture,
@@ -172,7 +238,22 @@ class _AppShellState extends State<_AppShell> {
     }
     if (activeTab == ActiveTab.myNotes && _viewingNote != null) {
       final note = _viewingNote!;
-      final ocrCount = _countOcrBlocks(note.id);
+      // Load images for viewer
+      final q = widget.db.noteImageBox
+          .query(NoteImage_.note.equals(note.id))
+          .order(NoteImage_.createdAt)
+          .build();
+      _viewingImages
+        ..clear()
+        ..addAll(q.find());
+      q.close();
+      final totalBlocks = _sumOcrBlocksForImages(_viewingImages);
+      final hasProcessing = _viewingImages.any(
+        (img) => _ocrInProgress.contains(img.id),
+      );
+      final hasFailed = _viewingImages.any(
+        (img) => _ocrFailed.contains(img.id),
+      );
       return NotePhotoViewPage(
         note: note,
         onBack: _closeCaptured,
@@ -181,14 +262,33 @@ class _AppShellState extends State<_AppShell> {
         onDelete: (note) {
           _deleteCaptured(note);
         },
-        isOcrProcessing: _ocrInProgress.contains(note.id),
-        isOcrFailed: _ocrFailed.contains(note.id),
-        ocrBlockCount: ocrCount,
-        onRetryOcr: () {
-          if (note.imageBytes != null && note.imageBytes!.isNotEmpty) {
-            _runOcrForNote(note, note.imageBytes!);
-          }
-        },
+        isOcrProcessing: hasProcessing,
+        isOcrFailed: hasFailed,
+        ocrBlockCount: totalBlocks,
+        onRetryOcr: () => _runOcrForPendingImages(note),
+        images: _viewingImages,
+        currentIndex: _currentImageIndex,
+        onAddImages: (imgs) => _addImagesToNote(note, imgs),
+        onDeleteCurrentImage: _viewingImages.isEmpty
+            ? null
+            : () => _deleteImage(_viewingImages[_currentImageIndex]),
+        onPrevImage: _viewingImages.length > 1
+            ? () {
+                setState(() {
+                  _currentImageIndex =
+                      (_currentImageIndex - 1 + _viewingImages.length) %
+                      _viewingImages.length;
+                });
+              }
+            : null,
+        onNextImage: _viewingImages.length > 1
+            ? () {
+                setState(() {
+                  _currentImageIndex =
+                      (_currentImageIndex + 1) % _viewingImages.length;
+                });
+              }
+            : null,
       );
     }
     switch (activeTab) {
@@ -210,65 +310,50 @@ class _AppShellState extends State<_AppShell> {
     }
   }
 
-  Future<void> _runOcrForNote(NoteRecord note, List<int> imageBytes) async {
-    try {
-      _ocrFailed.remove(note.id);
-      _ocrInProgress.add(note.id);
+  // Methods for OCR processing moved to image-level below
+
+  Future<void> _addImagesToNote(NoteRecord note, List<Uint8List> images) async {
+    if (images.isEmpty) return;
+    final created = <NoteImage>[];
+    for (final imgBytes in images) {
+      final img = NoteImage(imageBytes: imgBytes)..note.target = note;
+      widget.db.noteImageBox.put(img);
+      created.add(img);
+    }
+    if (_viewingNote?.id == note.id) {
+      final q = widget.db.noteImageBox
+          .query(NoteImage_.note.equals(note.id))
+          .order(NoteImage_.createdAt)
+          .build();
+      _viewingImages
+        ..clear()
+        ..addAll(q.find());
+      q.close();
       setState(() {});
-      // Configure your backend base URL here
-      final ocr = OcrService(baseUrl: 'http://localhost:8000');
-      final blocks = await ocr.detect(Uint8List.fromList(imageBytes));
-      // Persist each block
-      for (final b in blocks) {
-        final quadI32 = Int32List.fromList(b.quad);
-        final quadBytes = quadI32.buffer.asUint8List();
-        final ob = OcrBlock(text: b.text, quad: quadBytes);
-        ob.note.target = note;
-        widget.db.ocrBlockBox.put(ob);
-      }
-      // Mark note as processed
-      final updated = NoteRecord(
-        title: note.title,
-        course: note.course,
-        textContent: note.textContent,
-        imageBytes: note.imageBytes,
-        createdAt: note.createdAt,
-        updatedAt: DateTime.now(),
-        ocrProcessed: true,
-        embeddingProcessed: note.embeddingProcessed,
-      )..id = note.id;
-      widget.db.noteBox.put(updated);
-      // Update state list in-place
-      final idx = _notes.indexWhere((n) => n.id == note.id);
-      if (idx != -1) {
-        setState(() {
-          _notes[idx] = updated;
-          if (_viewingNote?.id == updated.id) _viewingNote = updated;
-        });
-      }
-    } catch (e) {
-      // Keep UI responsive; log error
-      // In future, expose a toast/snackbar if desired
-      // ignore: avoid_print
-      print('OCR failed: $e');
-      _ocrFailed.add(note.id);
-    } finally {
-      _ocrInProgress.remove(note.id);
-      setState(() {});
+    }
+    for (final img in created) {
+      await _runOcrForImage(img);
     }
   }
 
-  int _countOcrBlocks(int noteId) {
-    try {
-      final q = widget.db.ocrBlockBox
-          .query(OcrBlock_.note.equals(noteId))
-          .build();
-      final count = q.count();
-      q.close();
-      return count;
-    } catch (_) {
-      return 0;
+  Future<void> _deleteImage(NoteImage image) async {
+    final qb = widget.db.ocrBlockBox
+        .query(OcrBlock_.image.equals(image.id))
+        .build();
+    final blocks = qb.find();
+    qb.close();
+    if (blocks.isNotEmpty) {
+      widget.db.ocrBlockBox.removeMany(blocks.map((e) => e.id).toList());
     }
+    widget.db.noteImageBox.remove(image.id);
+    _ocrFailed.remove(image.id);
+    _ocrInProgress.remove(image.id);
+    _viewingImages.removeWhere((img) => img.id == image.id);
+    if (_currentImageIndex >= _viewingImages.length &&
+        _viewingImages.isNotEmpty) {
+      _currentImageIndex = _viewingImages.length - 1;
+    }
+    setState(() {});
   }
 
   @override

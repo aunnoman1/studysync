@@ -7,7 +7,7 @@ import '../theme.dart';
 
 class NoteCapturePage extends StatefulWidget {
   final void Function(
-    Uint8List? imageBytes,
+    List<Uint8List> imageBytesList,
     String title,
     String course,
     String? text,
@@ -26,7 +26,7 @@ class NoteCapturePage extends StatefulWidget {
 
 class _NoteCapturePageState extends State<NoteCapturePage> {
   final ImagePicker _picker = ImagePicker();
-  Uint8List? _imageBytes;
+  final List<Uint8List> _images = [];
   bool _isPicking = false;
   final TextEditingController _titleController = TextEditingController(
     text: '',
@@ -57,7 +57,23 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
       if (file != null) {
         final bytes = await file.readAsBytes();
         setState(() {
-          _imageBytes = bytes;
+          _images.add(bytes);
+        });
+      }
+    } finally {
+      setState(() => _isPicking = false);
+    }
+  }
+
+  Future<void> _pickMultiFromGallery() async {
+    if (_isPicking) return;
+    setState(() => _isPicking = true);
+    try {
+      final files = await _picker.pickMultiImage(imageQuality: 90);
+      if (files.isNotEmpty) {
+        final list = await Future.wait(files.map((f) => f.readAsBytes()));
+        setState(() {
+          _images.addAll(list);
         });
       }
     } finally {
@@ -73,13 +89,13 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
         label: 'images',
         extensions: <String>['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif'],
       );
-      final fs.XFile? file = await fs.openFile(
+      final files = await fs.openFiles(
         acceptedTypeGroups: <fs.XTypeGroup>[typeGroup],
       );
-      if (file != null) {
-        final bytes = await file.readAsBytes();
+      if (files.isNotEmpty) {
+        final list = await Future.wait(files.map((f) => f.readAsBytes()));
         setState(() {
-          _imageBytes = bytes;
+          _images.addAll(list);
         });
       }
     } finally {
@@ -184,11 +200,11 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                             ? null
                             : () => _isDesktop
                                   ? _pickFromFileSystem()
-                                  : _pick(ImageSource.gallery),
+                                  : _pickMultiFromGallery(),
                         icon: const Icon(Icons.upload_file),
                         label: const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Text('Upload Image'),
+                          child: Text('Upload Image(s)'),
                         ),
                       ),
                     ),
@@ -203,17 +219,55 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   alignment: Alignment.center,
-                  child: _imageBytes == null
+                  child: _images.isEmpty
                       ? const Text(
-                          'No image selected',
+                          'No images selected',
                           style: TextStyle(color: AppTheme.textSecondary),
                         )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.memory(
-                            _imageBytes!,
-                            fit: BoxFit.contain,
-                          ),
+                      : ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _images.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            final img = _images[index];
+                            return Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.memory(
+                                    img,
+                                    height: 336,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 4,
+                                  top: 4,
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _images.removeAt(index);
+                                      });
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      padding: const EdgeInsets.all(4),
+                                      child: const Icon(
+                                        Icons.close,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                 ),
                 const SizedBox(height: 16),
@@ -246,7 +300,7 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                               try {
                                 final title =
                                     _titleController.text.trim().isEmpty
-                                    ? (_imageBytes == null
+                                    ? (_images.isEmpty
                                           ? 'Text Note'
                                           : 'Photo Note')
                                     : _titleController.text.trim();
@@ -257,7 +311,7 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                                     : _textController.text.trim();
 
                                 widget.onSave(
-                                  _imageBytes,
+                                  _images,
                                   title,
                                   _selectedCourse,
                                   manualText,

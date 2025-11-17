@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
 import '../models/note_record.dart';
 import '../theme.dart';
 
@@ -12,6 +14,12 @@ class NotePhotoViewPage extends StatelessWidget {
   final bool isOcrFailed;
   final int ocrBlockCount;
   final VoidCallback onRetryOcr;
+  final List<NoteImage> images;
+  final int currentIndex;
+  final void Function(List<Uint8List> images) onAddImages;
+  final VoidCallback? onDeleteCurrentImage;
+  final VoidCallback? onPrevImage;
+  final VoidCallback? onNextImage;
   const NotePhotoViewPage({
     super.key,
     required this.note,
@@ -23,6 +31,12 @@ class NotePhotoViewPage extends StatelessWidget {
     required this.isOcrFailed,
     required this.ocrBlockCount,
     required this.onRetryOcr,
+    required this.images,
+    required this.currentIndex,
+    required this.onAddImages,
+    required this.onDeleteCurrentImage,
+    required this.onPrevImage,
+    required this.onNextImage,
   });
 
   String _formatDate(DateTime dt) {
@@ -31,6 +45,14 @@ class NotePhotoViewPage extends StatelessWidget {
     final m = d.month.toString().padLeft(2, '0');
     final day = d.day.toString().padLeft(2, '0');
     return '$y-$m-$day';
+  }
+
+  Future<void> _addFromGallery() async {
+    final picker = ImagePicker();
+    final files = await picker.pickMultiImage(imageQuality: 90);
+    if (files.isEmpty) return;
+    final list = await Future.wait(files.map((f) => f.readAsBytes()));
+    onAddImages(list);
   }
 
   @override
@@ -194,7 +216,7 @@ class NotePhotoViewPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                  ] else if (note.ocrProcessed) ...[
+                  ] else ...[
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -234,13 +256,70 @@ class NotePhotoViewPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (note.imageBytes != null)
+                if (images.isNotEmpty) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        tooltip: 'Previous image',
+                        onPressed: onPrevImage,
+                        icon: const Icon(
+                          Icons.chevron_left,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        'Page ${currentIndex + 1} of ${images.length}',
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Next image',
+                        onPressed: onNextImage,
+                        icon: const Icon(
+                          Icons.chevron_right,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      const Spacer(),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          // Desktop: open file selector; mobile/web: multi gallery
+                          // Heuristic: if file_selector is available use it; otherwise fallback
+                          // We attempt gallery first; users can also use desktop file selector below
+                          await _addFromGallery();
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Image(s)'),
+                      ),
+                      const SizedBox(width: 8),
+                      if (onDeleteCurrentImage != null)
+                        OutlinedButton.icon(
+                          onPressed: onDeleteCurrentImage,
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Color(0xFFEF4444),
+                          ),
+                          label: const Text('Delete Current'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFEF4444),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.memory(note.imageBytes!, fit: BoxFit.contain),
+                    child: Image.memory(
+                      images[currentIndex].imageBytes,
+                      fit: BoxFit.contain,
+                    ),
                   ),
+                ],
                 if ((note.textContent ?? '').isNotEmpty) ...[
-                  if (note.imageBytes != null) const SizedBox(height: 12),
+                  if (images.isNotEmpty) const SizedBox(height: 12),
                   const Text(
                     'Note',
                     style: TextStyle(color: AppTheme.textSecondary),

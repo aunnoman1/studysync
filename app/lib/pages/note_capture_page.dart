@@ -241,81 +241,95 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                   children: [
                     ElevatedButton(
                       // Disable button if saving
-                      onPressed: _isSaving ? null : () async { 
-                        
-                        // Set loading state
-                        setState(() => _isSaving = true);
+                      onPressed: _isSaving
+                          ? null
+                          : () async {
+                              // Set loading state
+                              setState(() => _isSaving = true);
 
-                        try {
-                          final title = _titleController.text.trim().isEmpty
-                              ? (_imageBytes == null ? 'Text Note' : 'Photo Note')
-                              : _titleController.text.trim();
-                          
-                          final manualText = _textController.text.trim().isEmpty
-                              ? null
-                              : _textController.text.trim();
+                              try {
+                                final title =
+                                    _titleController.text.trim().isEmpty
+                                    ? (_imageBytes == null
+                                          ? 'Text Note'
+                                          : 'Photo Note')
+                                    : _titleController.text.trim();
 
-                          String? ocrText;
+                                final manualText =
+                                    _textController.text.trim().isEmpty
+                                    ? null
+                                    : _textController.text.trim();
 
-                          // --- 🚀 YOUR API CALL GOES HERE ---
-                          if (_imageBytes != null) {
-                            try {
-                              // Replace with your FastAPI endpoint URL
-                              var uri = Uri.parse('http://192.168.18.84:8000/ocr');
-                              var request = http.MultipartRequest('POST', uri)
-                                ..files.add(
-                                  http.MultipartFile.fromBytes(
-                                    'file', // This 'file' key must match your FastAPI endpoint
-                                    _imageBytes!,
-                                    filename: 'note_image.jpg',
-                                    contentType: MediaType('image', 'jpeg'),
-                                  ),
+                                String? ocrText;
+
+                                // --- 🚀 YOUR API CALL GOES HERE ---
+                                if (_imageBytes != null) {
+                                  try {
+                                    // Replace with your FastAPI endpoint URL
+                                    var uri = Uri.parse(
+                                      'http://192.168.18.84:8000/ocr',
+                                    );
+                                    var request =
+                                        http.MultipartRequest('POST', uri)
+                                          ..files.add(
+                                            http.MultipartFile.fromBytes(
+                                              'file', // This 'file' key must match your FastAPI endpoint
+                                              _imageBytes!,
+                                              filename: 'note_image.jpg',
+                                              contentType: MediaType(
+                                                'image',
+                                                'jpeg',
+                                              ),
+                                            ),
+                                          );
+
+                                    var response = await request.send();
+
+                                    if (response.statusCode == 200) {
+                                      final responseBody = await response.stream
+                                          .bytesToString();
+                                      // Assuming your API returns a JSON like: {"text": "the ocr text"}
+                                      final data = jsonDecode(responseBody);
+                                      ocrText = data['text'];
+                                    } else {
+                                      // Handle API error (e.g., show a snackbar)
+                                      print(
+                                        'API Error: ${response.statusCode}',
+                                      );
+                                    }
+                                  } catch (e) {
+                                    // Handle network error
+                                    print('Network Error: $e');
+                                  }
+                                }
+                                // --- END OF API CALL ---
+
+                                // Combine manual text and OCR text
+                                String? finalTextContent = manualText;
+                                if (ocrText != null) {
+                                  if (finalTextContent == null) {
+                                    finalTextContent = ocrText;
+                                  } else {
+                                    finalTextContent =
+                                        '$finalTextContent\n\n--- OCR ---\n$ocrText';
+                                  }
+                                }
+
+                                // Finally, call the onSave with all the data
+                                widget.onSave(
+                                  _imageBytes,
+                                  title,
+                                  _selectedCourse,
+                                  finalTextContent, // Pass the combined text
                                 );
-
-                              var response = await request.send();
-
-                              if (response.statusCode == 200) {
-                                final responseBody = await response.stream.bytesToString();
-                                // Assuming your API returns a JSON like: {"text": "the ocr text"}
-                                final data = jsonDecode(responseBody); 
-                                ocrText = data['text'];
-                              } else {
-                                // Handle API error (e.g., show a snackbar)
-                                print('API Error: ${response.statusCode}');
+                              } finally {
+                                // Unset loading state
+                                setState(() => _isSaving = false);
                               }
-                            } catch (e) {
-                              // Handle network error
-                              print('Network Error: $e');
-                            }
-                          }
-                          // --- END OF API CALL ---
-
-                          // Combine manual text and OCR text
-                          String? finalTextContent = manualText;
-                          if (ocrText != null) {
-                            if (finalTextContent == null) {
-                              finalTextContent = ocrText;
-                            } else {
-                              finalTextContent = '$finalTextContent\n\n--- OCR ---\n$ocrText';
-                            }
-                          }
-
-                          // Finally, call the onSave with all the data
-                          widget.onSave(
-                            _imageBytes,
-                            title,
-                            _selectedCourse,
-                            finalTextContent, // Pass the combined text
-                          );
-
-                        } finally {
-                          // Unset loading state
-                          setState(() => _isSaving = false);
-                        }
-                      },
+                            },
                       // Show a spinner or the text
-                      child: _isSaving 
-                          ? const CircularProgressIndicator() 
+                      child: _isSaving
+                          ? const CircularProgressIndicator()
                           : const Padding(
                               padding: EdgeInsets.symmetric(
                                 horizontal: 16,

@@ -24,15 +24,15 @@ async def lifespan(app: FastAPI):
     """
     global processor, model
     print(f"--- Loading model on device: {device} with dtype: {model_dtype} ---")
-    
-    model_id = "microsoft/kosmos-2.5"
-    processor = AutoProcessor.from_pretrained(model_id)
+
+    local_model_path = "./models/ocr"
+    processor = AutoProcessor.from_pretrained(local_model_path)
     # 2. UPDATED MODEL LOADING WITH DTYPE
     model = AutoModelForVision2Seq.from_pretrained(
-        model_id, 
+        local_model_path,
         torch_dtype=model_dtype
     ).to(device)
-    
+
     print("--- Model loading complete ---")
     yield
     print("--- Shutting down and cleaning up model ---")
@@ -52,14 +52,14 @@ def post_process_ocr(generated_text: str, prompt: str, scale_height: float, scal
     """
     # Remove the prompt from the generated text
     text = generated_text.replace(prompt, "").strip()
-    
+
     # Define the regex pattern for bounding boxes
     pattern = r"<bbox><x_\d+><y_\d+><x_\d+><y_\d+></bbox>"
-    
+
     # Split the text by the bounding box pattern.
     # The first element is usually empty, so we take [1:]
     lines = re.split(pattern, text)[1:]
-    
+
     if not lines:
         # If no bounding boxes were found, the model might have returned
         # plain text. Let's try to clean it.
@@ -85,12 +85,12 @@ def run_kosmos_ocr(image: Image.Image) -> str:
 
         # Process the image and prompt
         inputs = processor(text=prompt, images=image, return_tensors="pt")
-        
+
         # Get scaling factors
         # .item() converts the 0-dim tensor to a plain Python number
         height = inputs.pop("height").item()
         width = inputs.pop("width").item()
-        
+
         scale_height = raw_height / height
         scale_width = raw_width / width
 
@@ -101,27 +101,27 @@ def run_kosmos_ocr(image: Image.Image) -> str:
 
         # Generate the output
         generated_ids = model.generate(
-            **inputs, 
+            **inputs,
             max_new_tokens=1024,
             use_cache=True
         )
 
         # Decode the generated text
         generated_text = processor.batch_decode(
-            generated_ids, 
+            generated_ids,
             skip_special_tokens=True
         )[0]
-        
+
         print(f"--- RAW MODEL OUTPUT: '{generated_text}' ---")
 
         # Use the new post-processing function
         output_text = post_process_ocr(
-            generated_text, 
-            prompt, 
-            scale_height, 
+            generated_text,
+            prompt,
+            scale_height,
             scale_width
         )
-            
+
         return output_text
 
     except Exception as e:
@@ -147,19 +147,19 @@ async def ocr_endpoint(file: UploadFile = File(...)):
         global last_image_bytes
         last_image_bytes = image_bytes
         # --- END OF DEBUG CODE ---
-        
+
         # Open the image using PIL
         pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
     except Exception as e:
         print(f"Error reading image: {e}")
         raise HTTPException(status_code=400, detail=f"Could not read image file: {e}")
-    
+
     try:
         # Run the blocking OCR function in a non-blocking way
         # 5. REMOVED THE "prompt" ARGUMENT AS IT'S NOW HARDCODED
         ocr_result = await run_in_threadpool(run_kosmos_ocr, pil_image)
-        
+
         # Return the successful result
         print(f"OCR RESULT: {ocr_result}")
         return {"text": ocr_result}
@@ -181,37 +181,37 @@ async def get_test_page():
         <head>
             <title>Test OCR Endpoint</title>
             <style>
-                body { 
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-                    margin: 40px; 
-                    background: #f0f2f5; 
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    margin: 40px;
+                    background: #f0f2f5;
                     color: #333;
                     display: grid;
                     place-items: center;
                     min-height: 80vh;
                 }
                 h1 { color: #111; }
-                div.container { 
-                    background: #ffffff; 
-                    padding: 30px; 
-                    border-radius: 12px; 
+                div.container {
+                    background: #ffffff;
+                    padding: 30px;
+                    border-radius: 12px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
                     width: 500px;
                 }
-                input[type="file"] { 
-                    margin-bottom: 20px; 
+                input[type="file"] {
+                    margin-bottom: 20px;
                     padding: 10px;
                     border: 1px solid #ddd;
                     border-radius: 6px;
                     width: 95%;
                 }
-                input[type="submit"] { 
-                    background: #007aff; 
-                    color: white; 
-                    border: none; 
-                    padding: 12px 20px; 
-                    border-radius: 6px; 
-                    cursor: pointer; 
+                input[type="submit"] {
+                    background: #007aff;
+                    color: white;
+                    border: none;
+                    padding: 12px 20px;
+                    border-radius: 6px;
+                    cursor: pointer;
                     font-size: 16px;
                     font-weight: 500;
                 }
@@ -222,7 +222,7 @@ async def get_test_page():
             <div class="container">
                 <h1>Test Kosmos 2.5 OCR</h1>
                 <p>Select an image to upload and test the /ocr endpoint.</p>
-                <!-- 
+                <!--
                 This form POSTs to your /ocr endpoint,
                 using multipart/form-data (required for files).
                 The input name "file" matches your endpoint's parameter.
@@ -248,7 +248,7 @@ async def get_last_image():
     global last_image_bytes
     if last_image_bytes is None:
         raise HTTPException(status_code=404, detail="No image has been processed yet.")
-    
+
     # We assume the Flutter app sent a JPEG, as per our previous fix.
     return Response(content=last_image_bytes, media_type="image/jpeg")
 

@@ -1,11 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_selector/file_selector.dart' as fs;
 import '../theme.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
-import 'dart:convert';
 
 class NoteCapturePage extends StatefulWidget {
   final void Function(
@@ -244,9 +242,7 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                       onPressed: _isSaving
                           ? null
                           : () async {
-                              // Set loading state
                               setState(() => _isSaving = true);
-
                               try {
                                 final title =
                                     _titleController.text.trim().isEmpty
@@ -260,70 +256,13 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                                     ? null
                                     : _textController.text.trim();
 
-                                String? ocrText;
-
-                                // --- 🚀 YOUR API CALL GOES HERE ---
-                                if (_imageBytes != null) {
-                                  try {
-                                    // Replace with your FastAPI endpoint URL
-                                    var uri = Uri.parse(
-                                      'http://192.168.18.84:8000/ocr',
-                                    );
-                                    var request =
-                                        http.MultipartRequest('POST', uri)
-                                          ..files.add(
-                                            http.MultipartFile.fromBytes(
-                                              'file', // This 'file' key must match your FastAPI endpoint
-                                              _imageBytes!,
-                                              filename: 'note_image.jpg',
-                                              contentType: MediaType(
-                                                'image',
-                                                'jpeg',
-                                              ),
-                                            ),
-                                          );
-
-                                    var response = await request.send();
-
-                                    if (response.statusCode == 200) {
-                                      final responseBody = await response.stream
-                                          .bytesToString();
-                                      // Assuming your API returns a JSON like: {"text": "the ocr text"}
-                                      final data = jsonDecode(responseBody);
-                                      ocrText = data['text'];
-                                    } else {
-                                      // Handle API error (e.g., show a snackbar)
-                                      print(
-                                        'API Error: ${response.statusCode}',
-                                      );
-                                    }
-                                  } catch (e) {
-                                    // Handle network error
-                                    print('Network Error: $e');
-                                  }
-                                }
-                                // --- END OF API CALL ---
-
-                                // Combine manual text and OCR text
-                                String? finalTextContent = manualText;
-                                if (ocrText != null) {
-                                  if (finalTextContent == null) {
-                                    finalTextContent = ocrText;
-                                  } else {
-                                    finalTextContent =
-                                        '$finalTextContent\n\n--- OCR ---\n$ocrText';
-                                  }
-                                }
-
-                                // Finally, call the onSave with all the data
                                 widget.onSave(
                                   _imageBytes,
                                   title,
                                   _selectedCourse,
-                                  finalTextContent, // Pass the combined text
+                                  manualText,
                                 );
                               } finally {
-                                // Unset loading state
                                 setState(() => _isSaving = false);
                               }
                             },

@@ -45,35 +45,81 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # 3. ADDED POST_PROCESS FUNCTION (MODIFIED FROM YOUR EXAMPLE)
-def post_process_ocr(generated_text: str, prompt: str, scale_height: float, scale_width: float) -> str:
+def post_process_ocr(generated_text: str, prompt: str, scale_height: float, scale_width: float):
     """
     Parses the structured output from Kosmos 2.5 <ocr> prompt.
-    Returns only the detected text, joined by newlines.
+    Returns a list of blocks as dicts: { 'text': str, 'quad': [x1,y1,x2,y2,x3,y3,x4,y4] }
+    Coords are scaled back to the original image pixel space using the provided scale factors.
+    Falls back to parsing CSV-like lines if no <bbox> tags are found.
     """
     # Remove the prompt from the generated text
     text = generated_text.replace(prompt, "").strip()
 
-    # Define the regex pattern for bounding boxes
-    pattern = r"<bbox><x_\d+><y_\d+><x_\d+><y_\d+></bbox>"
+    blocks = []
 
-    # Split the text by the bounding box pattern.
-    # The first element is usually empty, so we take [1:]
-    lines = re.split(pattern, text)[1:]
+    # Pattern 1: Kosmos bbox tags with 4 coordinate pairs, followed by optional text
+    # Example: <bbox><x_35><y_48><x_806><y_48><x_806><y_99><x_35><y_99></bbox>some text
+    # Accept 2-pair (x1,y1,x2,y2) OR 4-pair (x1,y1,x2,y2,x3,y3,x4,y4)
+    kosmos_pattern = re.compile(
+        r"<bbox>"
+        r"<x_(\d+)><y_(\d+)>"
+        r"<x_(\d+)><y_(\d+)>"
+        r"(?:<x_(\d+)><y_(\d+)><x_(\d+)><y_(\d+)>)?"
+        r"</bbox>\s*([^\n<]*)",
+        re.IGNORECASE,
+    )
+    for m in kosmos_pattern.finditer(text):
+        g = m.groups()
+        x1, y1, x2, y2 = map(int, g[:4])
+        # Optional additional pairs (x3,y3,x4,y4)
+        opt = g[4:8]
+        raw_label = (g[8] or "").strip()
 
-    if not lines:
-        # If no bounding boxes were found, the model might have returned
-        # plain text. Let's try to clean it.
-        if "the text is:" in text.lower():
-            text = text.split(":", 1)[-1].strip()
-        return text
+        if all(opt):
+            x3, y3, x4, y4 = map(int, opt)
+            quad = [x1, y1, x2, y2, x3, y3, x4, y4]
+        else:
+            # Build rectangle quad from two corners (x1,y1) top-left, (x2,y2) bottom-right
+            quad = [x1, y1, x2, y1, x2, y2, x1, y2]
 
-    # We just want the text, not the coordinates.
-    # Join all detected text lines with a newline.
-    return "\n".join(line.strip() for line in lines)
+        # Scale back to original image size
+        scaled = []
+        for i, val in enumerate(quad):
+            if i % 2 == 0:
+                scaled.append(int(round(val * scale_width)))
+            else:
+                scaled.append(int(round(val * scale_height)))
+        blocks.append({"text": raw_label, "quad": scaled})
+
+    if blocks:
+        return blocks
+
+    # Pattern 2: Fallback for CSV-like lines (x1,y1,x2,y2,x3,y3,x4,y4[,text])
+    # Example: 35,48,806,48,806,99,35,99,Some text here
+    csv_lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    csv_pattern = re.compile(
+        r"^\s*(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)(?:,(.*))?$"
+    )
+    for ln in csv_lines:
+        m = csv_pattern.match(ln)
+        if not m:
+            continue
+        nums = list(map(int, m.groups()[:8]))
+        lbl = (m.group(9) or "").strip()
+        scaled = []
+        for i, val in enumerate(nums):
+            if i % 2 == 0:
+                scaled.append(int(round(val * scale_width)))
+            else:
+                scaled.append(int(round(val * scale_height)))
+        blocks.append({"text": lbl, "quad": scaled})
+
+    # If still nothing parsed, return empty list (caller can decide)
+    return blocks
 
 
 # 4. COMPLETELY REWRITTEN KOSMOS FUNCTION
-def run_kosmos_ocr(image: Image.Image) -> str:
+def run_kosmos_ocr(image: Image.Image):
     """
     This is the "blocking" function that runs the AI model.
     We run this in a threadpool to avoid blocking the main server thread.
@@ -115,14 +161,13 @@ def run_kosmos_ocr(image: Image.Image) -> str:
         print(f"--- RAW MODEL OUTPUT: '{generated_text}' ---")
 
         # Use the new post-processing function
-        output_text = post_process_ocr(
+        blocks = post_process_ocr(
             generated_text,
             prompt,
             scale_height,
             scale_width
         )
-
-        return output_text
+        return blocks
 
     except Exception as e:
         print(f"Error during model inference: {e}")
@@ -158,11 +203,9 @@ async def ocr_endpoint(file: UploadFile = File(...)):
     try:
         # Run the blocking OCR function in a non-blocking way
         # 5. REMOVED THE "prompt" ARGUMENT AS IT'S NOW HARDCODED
-        ocr_result = await run_in_threadpool(run_kosmos_ocr, pil_image)
-
-        # Return the successful result
-        print(f"OCR RESULT: {ocr_result}")
-        return {"text": ocr_result}
+        blocks = await run_in_threadpool(run_kosmos_ocr, pil_image)
+        print(f"OCR BLOCKS: {len(blocks)}")
+        return {"blocks": blocks}
 
     except Exception as e:
         # Handle errors that happened during the model inference

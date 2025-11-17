@@ -8,6 +8,10 @@ class NotePhotoViewPage extends StatelessWidget {
   final void Function(NoteRecord note, String newTitle) onRename;
   final void Function(NoteRecord note, String newCourse) onUpdateCourse;
   final void Function(NoteRecord note) onDelete;
+  final bool isOcrProcessing;
+  final bool isOcrFailed;
+  final int ocrBlockCount;
+  final VoidCallback onRetryOcr;
   const NotePhotoViewPage({
     super.key,
     required this.note,
@@ -15,6 +19,10 @@ class NotePhotoViewPage extends StatelessWidget {
     required this.onRename,
     required this.onUpdateCourse,
     required this.onDelete,
+    required this.isOcrProcessing,
+    required this.isOcrFailed,
+    required this.ocrBlockCount,
+    required this.onRetryOcr,
   });
 
   String _formatDate(DateTime dt) {
@@ -159,6 +167,52 @@ class NotePhotoViewPage extends StatelessWidget {
                       }
                     },
                   ),
+                  const SizedBox(width: 16),
+                  if (isOcrProcessing) ...[
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'OCR processing...',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ] else if (isOcrFailed) ...[
+                    OutlinedButton.icon(
+                      onPressed: onRetryOcr,
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('Retry OCR'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                      ),
+                    ),
+                  ] else if (note.ocrProcessed) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF14532D),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'OCR processed ($ocrBlockCount)',
+                        style: const TextStyle(
+                          color: Color(0xFFBBF7D0),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],

@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../models/note_record.dart';
 
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
+  final List<NoteRecord> recentNotes;
+  final void Function(NoteRecord note) onOpenNote;
+  const DashboardPage({
+    super.key,
+    required this.recentNotes,
+    required this.onOpenNote,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -11,7 +18,14 @@ class DashboardPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Dashboard', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+          const Text(
+            'Dashboard',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
+          ),
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -25,10 +39,10 @@ class DashboardPage extends StatelessWidget {
                 childAspectRatio: 1.2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                children: const [
-                  _CardRecentNotes(),
-                  _CardTutorQuickAccess(),
-                  _CardCommunityActivity(),
+                children: [
+                  _CardRecentNotes(notes: recentNotes, onOpenNote: onOpenNote),
+                  const _CardTutorQuickAccess(),
+                  const _CardCommunityActivity(),
                 ],
               );
             },
@@ -40,23 +54,46 @@ class DashboardPage extends StatelessWidget {
 }
 
 class _CardRecentNotes extends StatelessWidget {
-  const _CardRecentNotes();
+  final List<NoteRecord> notes;
+  final void Function(NoteRecord note) onOpenNote;
+  const _CardRecentNotes({required this.notes, required this.onOpenNote});
 
   @override
   Widget build(BuildContext context) {
+    final items = notes.take(3).toList();
     return Container(
-      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(12), boxShadow: const [
-        BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
-      ]),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+        ],
+      ),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text('Recent Notes', style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
-          SizedBox(height: 12),
-          _RecentNoteItem('Data Structures - Lecture 3'),
-          _RecentNoteItem('OOP Concepts'),
-          _RecentNoteItem('Database Schema Design'),
+        children: [
+          const Text(
+            'Recent Notes',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (items.isEmpty)
+            const Text(
+              'No notes yet',
+              style: TextStyle(color: AppTheme.textSecondary),
+            )
+          else
+            ...items.map(
+              (n) => _RecentNoteItem(
+                n.title.isEmpty ? 'Untitled note' : n.title,
+                onTap: () => onOpenNote(n),
+              ),
+            ),
         ],
       ),
     );
@@ -65,18 +102,44 @@ class _CardRecentNotes extends StatelessWidget {
 
 class _RecentNoteItem extends StatelessWidget {
   final String title;
-  const _RecentNoteItem(this.title);
+  final VoidCallback onTap;
+  const _RecentNoteItem(this.title, {required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF374151),
-        borderRadius: BorderRadius.circular(8),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppTheme.lightInputFill,
+          border: Border.all(color: AppTheme.border),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.description,
+              size: 16,
+              color: AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(color: AppTheme.textPrimary),
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: AppTheme.textSecondary,
+            ),
+          ],
+        ),
       ),
-      child: Text(title, style: const TextStyle(color: AppTheme.textPrimary)),
     );
   }
 }
@@ -87,19 +150,35 @@ class _CardTutorQuickAccess extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(12), boxShadow: const [
-        BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
-      ]),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+        ],
+      ),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('AI Tutor Quick Access', style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
+          const Text(
+            'AI Tutor Quick Access',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 12),
-          const Text('Ask a question about your recent notes:', style: TextStyle(color: AppTheme.textSecondary)),
+          const Text(
+            'Ask a question about your recent notes:',
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
           const SizedBox(height: 12),
           const TextField(
-            decoration: InputDecoration(hintText: 'E.g., Explain polymorphism in OOP'),
+            decoration: InputDecoration(
+              hintText: 'E.g., Explain polymorphism in OOP',
+            ),
           ),
         ],
       ),
@@ -113,14 +192,25 @@ class _CardCommunityActivity extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(12), boxShadow: const [
-        BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
-      ]),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+        ],
+      ),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: const [
-          Text('Community Activity', style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
+          Text(
+            'Community Activity',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           SizedBox(height: 12),
           Text(
             'New post in "DSA Helpers": "How to implement a binary search tree?"',
@@ -131,5 +221,3 @@ class _CardCommunityActivity extends StatelessWidget {
     );
   }
 }
-
-

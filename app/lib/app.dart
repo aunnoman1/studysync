@@ -27,13 +27,13 @@ class StudySyncApp extends StatelessWidget {
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
+        statusBarIconBrightness: Brightness.dark,
       ),
     );
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'StudySync',
-      theme: AppTheme.dark(),
+      theme: AppTheme.light(),
       home: _AppShell(db: db),
     );
   }
@@ -221,6 +221,30 @@ class _AppShellState extends State<_AppShell> {
     }
   }
 
+  void _updateNoteText(NoteRecord note, String? newText) {
+    final idx = _notes.indexWhere((n) => n.id == note.id);
+    if (idx != -1) {
+      final updated = NoteRecord(
+        title: note.title,
+        course: note.course,
+        textContent: (newText == null || newText.trim().isEmpty)
+            ? null
+            : newText.trim(),
+        createdAt: note.createdAt,
+        updatedAt: DateTime.now(),
+        ocrProcessed: note.ocrProcessed,
+        embeddingProcessed: note.embeddingProcessed,
+      )..id = note.id;
+      setState(() {
+        _notes[idx] = updated;
+        if (_viewingNote?.id == updated.id) {
+          _viewingNote = updated;
+        }
+      });
+      widget.db.noteBox.put(updated);
+    }
+  }
+
   void _deleteCaptured(NoteRecord note) {
     widget.db.noteBox.remove(note.id);
     setState(() {
@@ -285,6 +309,7 @@ class _AppShellState extends State<_AppShell> {
         onBack: _closeCaptured,
         onRename: _renameCaptured,
         onUpdateCourse: _updateCourse,
+        onUpdateText: _updateNoteText,
         onDelete: (note) {
           _deleteCaptured(note);
         },
@@ -323,7 +348,15 @@ class _AppShellState extends State<_AppShell> {
     }
     switch (activeTab) {
       case ActiveTab.dashboard:
-        return const DashboardPage();
+        return DashboardPage(
+          recentNotes: _notes,
+          onOpenNote: (note) {
+            setState(() {
+              activeTab = ActiveTab.myNotes;
+            });
+            _openCaptured(note);
+          },
+        );
       case ActiveTab.myNotes:
         return MyNotesPage(
           onCreateNew: _openEditorNew,

@@ -30,7 +30,8 @@ class ProfilePage extends StatelessWidget {
                       width: 84,
                       height: 84,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF374151),
+                        color: AppTheme.lightInputFill,
+                        border: Border.all(color: AppTheme.border),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -38,7 +39,7 @@ class ProfilePage extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
-                        Text('Muhammad Rohaim', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                        Text('Muhammad Rohaim', style: TextStyle(color: AppTheme.textPrimary, fontSize: 22, fontWeight: FontWeight.bold)),
                         SizedBox(height: 4),
                         Text('22L-6573', style: TextStyle(color: AppTheme.textSecondary)),
                       ],

@@ -9,6 +9,7 @@ class NotePhotoViewPage extends StatelessWidget {
   final VoidCallback onBack;
   final void Function(NoteRecord note, String newTitle) onRename;
   final void Function(NoteRecord note, String newCourse) onUpdateCourse;
+  final void Function(NoteRecord note, String? newText) onUpdateText;
   final void Function(NoteRecord note) onDelete;
   final bool isOcrProcessing;
   final bool isOcrFailed;
@@ -30,6 +31,7 @@ class NotePhotoViewPage extends StatelessWidget {
     required this.onBack,
     required this.onRename,
     required this.onUpdateCourse,
+    required this.onUpdateText,
     required this.onDelete,
     required this.isOcrProcessing,
     required this.isOcrFailed,
@@ -97,7 +99,11 @@ class NotePhotoViewPage extends StatelessWidget {
                     context: context,
                     builder: (context) {
                       return AlertDialog(
-                        title: const Text('Rename note'),
+                        backgroundColor: AppTheme.surface,
+                        title: const Text(
+                          'Rename note',
+                          style: TextStyle(color: AppTheme.textPrimary),
+                        ),
                         content: TextField(
                           controller: controller,
                           decoration: const InputDecoration(
@@ -132,8 +138,15 @@ class NotePhotoViewPage extends StatelessWidget {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: const Text('Delete note?'),
-                      content: const Text('This action cannot be undone.'),
+                      backgroundColor: AppTheme.surface,
+                      title: const Text(
+                        'Delete note?',
+                        style: TextStyle(color: AppTheme.textPrimary),
+                      ),
+                      content: const Text(
+                        'This action cannot be undone.',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(false),
@@ -177,7 +190,7 @@ class NotePhotoViewPage extends StatelessWidget {
                   ),
                   DropdownButton<String>(
                     value: note.course,
-                    dropdownColor: const Color(0xFF374151),
+                    dropdownColor: AppTheme.surface,
                     items: const ['PF', 'OOP', 'DSA', 'DB']
                         .map(
                           (c) => DropdownMenuItem<String>(
@@ -318,25 +331,106 @@ class NotePhotoViewPage extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.memory(
-                      images[currentIndex].imageBytes,
-                      fit: BoxFit.contain,
+                  SizedBox(
+                    width: double.infinity,
+                    height: MediaQuery.of(context).size.height * 0.6,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.memory(
+                        images[currentIndex].imageBytes,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Container(
+                    height: 240,
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightInputFill,
+                      border: Border.all(color: AppTheme.border),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'No images',
+                          style: TextStyle(color: AppTheme.textSecondary),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            await _addFromGallery();
+                          },
+                          icon: const Icon(Icons.add_photo_alternate_outlined),
+                          label: const Text('Add Image(s)'),
+                        ),
+                      ],
                     ),
                   ),
                 ],
                 if ((note.textContent ?? '').isNotEmpty) ...[
                   if (images.isNotEmpty) const SizedBox(height: 12),
-                  const Text(
-                    'Note',
-                    style: TextStyle(color: AppTheme.textSecondary),
+                  Row(
+                    children: [
+                      const Text(
+                        'Note',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
+                      const Spacer(),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final controller =
+                              TextEditingController(text: note.textContent ?? '');
+                          final updatedText = await showDialog<String>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              backgroundColor: AppTheme.surface,
+                              title: const Text(
+                                'Edit note',
+                                style: TextStyle(color: AppTheme.textPrimary),
+                              ),
+                              content: SizedBox(
+                                width: 480,
+                                child: TextField(
+                                  controller: controller,
+                                  maxLines: null,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Write your note...',
+                                  ),
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(context)
+                                      .pop(controller.text),
+                                  child: const Text('Save'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (updatedText != null) {
+                            onUpdateText(
+                              note,
+                              updatedText.trim().isEmpty ? null : updatedText,
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF111827),
+                      color: AppTheme.lightInputFill,
                       border: Border.all(color: AppTheme.border),
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -344,6 +438,58 @@ class NotePhotoViewPage extends StatelessWidget {
                       note.textContent!,
                       style: const TextStyle(color: AppTheme.textPrimary),
                     ),
+                  ),
+                ] else ...[
+                  if (images.isNotEmpty) const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text(
+                        'Note',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
+                      const Spacer(),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final controller = TextEditingController(text: '');
+                          final newText = await showDialog<String>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              backgroundColor: AppTheme.surface,
+                              title: const Text(
+                                'Add note',
+                                style: TextStyle(color: AppTheme.textPrimary),
+                              ),
+                              content: SizedBox(
+                                width: 480,
+                                child: TextField(
+                                  controller: controller,
+                                  maxLines: null,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Write your note...',
+                                  ),
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(context)
+                                      .pop(controller.text),
+                                  child: const Text('Save'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (newText != null && newText.trim().isNotEmpty) {
+                            onUpdateText(note, newText.trim());
+                          }
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add'),
+                      ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 12),

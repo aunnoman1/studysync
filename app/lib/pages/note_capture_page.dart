@@ -214,7 +214,7 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                 Container(
                   height: 360,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF111827),
+                    color: AppTheme.lightInputFill,
                     border: Border.all(color: AppTheme.border),
                     borderRadius: BorderRadius.circular(12),
                   ),

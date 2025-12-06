@@ -17,6 +17,7 @@ import 'services/embedding_service.dart';
 import 'dart:typed_data';
 import 'objectbox.g.dart';
 import 'env.dart';
+import 'pages/note_debug_page.dart';
 
 class StudySyncApp extends StatelessWidget {
   final ObjectBox db;
@@ -608,6 +609,46 @@ class _AppShellState extends State<_AppShell> {
               ),
             ],
           ),
+          floatingActionButton:
+              (activeTab == ActiveTab.myNotes && _viewingNote != null)
+              ? FloatingActionButton.extended(
+                  onPressed: () {
+                    final note = _viewingNote!;
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => NoteDebugPage(
+                          note: note,
+                          images: _viewingImages,
+                          currentIndex: _currentImageIndex,
+                          fetchOcrBlocks: (image) {
+                            final q = widget.db.ocrBlockBox
+                                .query(OcrBlock_.image.equals(image.id))
+                                .build();
+                            final blocks = q.find();
+                            q.close();
+                            blocks.sort(
+                              (a, b) =>
+                                  a.readingOrder.compareTo(b.readingOrder),
+                            );
+                            return blocks;
+                          },
+                          fetchTextChunks: (n) {
+                            final q = widget.db.textChunkBox
+                                .query(TextChunk_.note.equals(n.id))
+                                .order(TextChunk_.orderIndex)
+                                .build();
+                            final chunks = q.find();
+                            q.close();
+                            return chunks;
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.bug_report_outlined),
+                  label: const Text('Debug'),
+                )
+              : null,
         );
       },
     );

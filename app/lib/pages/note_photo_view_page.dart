@@ -226,15 +226,21 @@ class NotePhotoViewPage extends StatelessWidget {
                       ),
                     ),
                   ] else if (isOcrFailed) ...[
-                    OutlinedButton.icon(
+                    OutlinedButton(
                       onPressed: onRetryOcr,
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('Retry OCR'),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 6,
                         ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.refresh, size: 16),
+                          SizedBox(width: 6),
+                          Text('Retry OCR'),
+                        ],
                       ),
                     ),
                   ] else ...[
@@ -305,27 +311,39 @@ class NotePhotoViewPage extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      OutlinedButton.icon(
+                      OutlinedButton(
                         onPressed: () async {
                           // Desktop: open file selector; mobile/web: multi gallery
                           // Heuristic: if file_selector is available use it; otherwise fallback
                           // We attempt gallery first; users can also use desktop file selector below
                           await _addFromGallery();
                         },
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Image(s)'),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.add),
+                            SizedBox(width: 6),
+                            Text('Add Image(s)'),
+                          ],
+                        ),
                       ),
                       const SizedBox(width: 8),
                       if (onDeleteCurrentImage != null)
-                        OutlinedButton.icon(
+                        OutlinedButton(
                           onPressed: onDeleteCurrentImage,
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Color(0xFFEF4444),
-                          ),
-                          label: const Text('Delete Current'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFFEF4444),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(
+                                Icons.delete_outline,
+                                color: Color(0xFFEF4444),
+                              ),
+                              SizedBox(width: 6),
+                              Text('Delete Current'),
+                            ],
                           ),
                         ),
                     ],
@@ -359,12 +377,18 @@ class NotePhotoViewPage extends StatelessWidget {
                           style: TextStyle(color: AppTheme.textSecondary),
                         ),
                         const SizedBox(height: 12),
-                        OutlinedButton.icon(
+                        OutlinedButton(
                           onPressed: () async {
                             await _addFromGallery();
                           },
-                          icon: const Icon(Icons.add_photo_alternate_outlined),
-                          label: const Text('Add Image(s)'),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.add_photo_alternate_outlined),
+                              SizedBox(width: 6),
+                              Text('Add Image(s)'),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -379,10 +403,11 @@ class NotePhotoViewPage extends StatelessWidget {
                         style: TextStyle(color: AppTheme.textSecondary),
                       ),
                       const Spacer(),
-                      OutlinedButton.icon(
+                      OutlinedButton(
                         onPressed: () async {
-                          final controller =
-                              TextEditingController(text: note.textContent ?? '');
+                          final controller = TextEditingController(
+                            text: note.textContent ?? '',
+                          );
                           final updatedText = await showDialog<String>(
                             context: context,
                             builder: (context) => AlertDialog(
@@ -407,8 +432,9 @@ class NotePhotoViewPage extends StatelessWidget {
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
-                                  onPressed: () => Navigator.of(context)
-                                      .pop(controller.text),
+                                  onPressed: () => Navigator.of(
+                                    context,
+                                  ).pop(controller.text),
                                   child: const Text('Save'),
                                 ),
                               ],
@@ -421,8 +447,14 @@ class NotePhotoViewPage extends StatelessWidget {
                             );
                           }
                         },
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Edit'),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.edit),
+                            SizedBox(width: 6),
+                            Text('Edit'),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -448,7 +480,7 @@ class NotePhotoViewPage extends StatelessWidget {
                         style: TextStyle(color: AppTheme.textSecondary),
                       ),
                       const Spacer(),
-                      OutlinedButton.icon(
+                      OutlinedButton(
                         onPressed: () async {
                           final controller = TextEditingController(text: '');
                           final newText = await showDialog<String>(
@@ -475,8 +507,9 @@ class NotePhotoViewPage extends StatelessWidget {
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
-                                  onPressed: () => Navigator.of(context)
-                                      .pop(controller.text),
+                                  onPressed: () => Navigator.of(
+                                    context,
+                                  ).pop(controller.text),
                                   child: const Text('Save'),
                                 ),
                               ],
@@ -486,8 +519,14 @@ class NotePhotoViewPage extends StatelessWidget {
                             onUpdateText(note, newText.trim());
                           }
                         },
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add'),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.add),
+                            SizedBox(width: 6),
+                            Text('Add'),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -515,15 +554,21 @@ class NotePhotoViewPage extends StatelessWidget {
                         ),
                       ),
                     ] else if (isEmbFailed) ...[
-                      OutlinedButton.icon(
+                      OutlinedButton(
                         onPressed: onRetryEmbeddings,
-                        icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('Retry'),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 6,
                           ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.refresh, size: 16),
+                            SizedBox(width: 6),
+                            Text('Retry'),
+                          ],
                         ),
                       ),
                     ] else if (note.embeddingProcessed) ...[

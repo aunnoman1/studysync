@@ -1,71 +1,195 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme.dart';
 
 class AuthPage extends StatefulWidget {
   final VoidCallback onLogin;
-  const AuthPage({super.key, required this.onLogin});
+  final VoidCallback onGuest;
+  final bool initialIsLogin;
+  const AuthPage({
+    super.key,
+    required this.onLogin,
+    required this.onGuest,
+    this.initialIsLogin = true,
+  });
 
   @override
   State<AuthPage> createState() => _AuthPageState();
 }
 
 class _AuthPageState extends State<AuthPage> {
-  bool isLoginView = true;
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _usernameController = TextEditingController();
+  late bool _isLogin = widget.initialIsLogin;
+  bool _loading = false;
+  String? _error;
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _usernameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-close this page when a Supabase session appears (login completed elsewhere)
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      final session = event.session;
+      if (session != null && mounted) {
+        widget.onLogin();
+        Navigator.of(context).maybePop();
+      }
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final supabase = Supabase.instance.client;
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+      if (_isLogin) {
+        await supabase.auth.signInWithPassword(email: email, password: password);
+      } else {
+        await supabase.auth.signUp(
+          email: email,
+          password: password,
+          data: {
+            'username': _usernameController.text.trim(),
+          },
+        );
+      }
+      widget.onLogin();
+      if (mounted) {
+        Navigator.of(context).maybePop();
+      }
+    } on AuthException catch (e) {
+      setState(() => _error = e.message);
+    } catch (e) {
+      setState(() => _error = 'Unexpected error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Sign in to StudySync')),
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                const Text(
-                  'StudySync',
-                  style: TextStyle(
-                    color: Color(0xFF60A5FA),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 36,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Your AI-powered study partner.',
-                  style: TextStyle(color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Card(
+            color: AppTheme.surface,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: AppTheme.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _isLogin ? 'Welcome back' : 'Create your account',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_error != null)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1F2),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: Color(0xFFB91C1C)),
+                        ),
+                      ),
+                    if (!_isLogin) ...[
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _usernameController,
+                        decoration: const InputDecoration(labelText: 'Username'),
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Enter a username' : null,
                       ),
                     ],
-                  ),
-                  child: isLoginView
-                      ? LoginForm(onLogin: widget.onLogin)
-                      : RegisterForm(onLogin: widget.onLogin),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () => setState(() => isLoginView = !isLoginView),
-                  child: Text(
-                    isLoginView ? "Don't have an account? Register" : "Already have an account? Login",
-                    style: const TextStyle(
-                      color: Color(0xFF60A5FA),
-                      fontWeight: FontWeight.w600,
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: const InputDecoration(labelText: 'Email'),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) =>
+                          (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _passwordController,
+                      decoration: const InputDecoration(labelText: 'Password'),
+                      obscureText: true,
+                      validator: (v) =>
+                          (v == null || v.length < 6) ? 'Min 6 characters' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loading ? null : _submit,
+                      child: _loading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(_isLogin ? 'Sign In' : 'Sign Up'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => setState(() => _isLogin = !_isLogin),
+                      child: Text(
+                        _isLogin
+                            ? "Don't have an account? Sign Up"
+                            : "Have an account? Sign In",
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: _loading
+                          ? null
+                          : () {
+                              widget.onGuest();
+                              if (mounted) {
+                                Navigator.of(context).maybePop();
+                              }
+                            },
+                      child: const Text('Continue without account'),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -73,109 +197,3 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 }
-
-class LoginForm extends StatelessWidget {
-  final VoidCallback onLogin;
-  const LoginForm({super.key, required this.onLogin});
-
-  @override
-  Widget build(BuildContext context) {
-    return Form(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 4),
-          const Text(
-            'Login',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22),
-          ),
-          const SizedBox(height: 16),
-          const Text('Student ID or Email', style: TextStyle(color: AppTheme.textSecondary)),
-          const SizedBox(height: 6),
-          const TextField(
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              hintText: '22L-6573@lhr.nu.edu.pk',
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text('Password', style: TextStyle(color: AppTheme.textSecondary)),
-          const SizedBox(height: 6),
-          const TextField(
-            obscureText: true,
-            decoration: InputDecoration(
-              hintText: '••••••••',
-            ),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: onLogin,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
-              child: Text('Login', style: TextStyle(fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class RegisterForm extends StatelessWidget {
-  final VoidCallback onLogin;
-  const RegisterForm({super.key, required this.onLogin});
-
-  @override
-  Widget build(BuildContext context) {
-    return Form(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 4),
-          const Text(
-            'Create Account',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22),
-          ),
-          const SizedBox(height: 16),
-          const Text('Full Name', style: TextStyle(color: AppTheme.textSecondary)),
-          const SizedBox(height: 6),
-          const TextField(
-            decoration: InputDecoration(hintText: 'e.g., Mahad Farhan Khan'),
-          ),
-          const SizedBox(height: 12),
-          const Text('Student ID', style: TextStyle(color: AppTheme.textSecondary)),
-          const SizedBox(height: 6),
-          const TextField(
-            decoration: InputDecoration(hintText: 'e.g., 22L-6589'),
-          ),
-          const SizedBox(height: 12),
-          const Text('Email', style: TextStyle(color: AppTheme.textSecondary)),
-          const SizedBox(height: 6),
-          const TextField(
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(hintText: 'e.g., 22L-6589@lhr.nu.edu.pk'),
-          ),
-          const SizedBox(height: 12),
-          const Text('Password', style: TextStyle(color: AppTheme.textSecondary)),
-          const SizedBox(height: 6),
-          const TextField(
-            obscureText: true,
-            decoration: InputDecoration(hintText: '••••••••'),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: onLogin,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
-              child: Text('Register', style: TextStyle(fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-

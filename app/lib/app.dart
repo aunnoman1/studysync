@@ -18,6 +18,7 @@ import 'dart:typed_data';
 import 'objectbox.g.dart';
 import 'env.dart';
 import 'pages/note_debug_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class StudySyncApp extends StatelessWidget {
   final ObjectBox db;
@@ -50,6 +51,7 @@ class _AppShell extends StatefulWidget {
 
 class _AppShellState extends State<_AppShell> {
   bool isAuthenticated = false;
+  bool useGuestMode = false;
   ActiveTab activeTab = ActiveTab.dashboard;
   bool isCapturingNote = false;
   final List<NoteRecord> _notes = [];
@@ -68,6 +70,23 @@ class _AppShellState extends State<_AppShell> {
     final loaded = widget.db.noteBox.getAll();
     loaded.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _notes.addAll(loaded);
+    // Auth initial state + listener
+    final client = Supabase.instance.client;
+    isAuthenticated = client.auth.currentSession != null;
+    client.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      if (mounted) {
+        setState(() {
+          isAuthenticated = useGuestMode || session != null;
+          if (session != null) {
+            // After logging in, always land on dashboard
+            activeTab = ActiveTab.dashboard;
+            isCapturingNote = false;
+            _viewingNote = null;
+          }
+        });
+      }
+    });
   }
 
   Future<void> _runOcrForImage(NoteImage image) async {
@@ -370,7 +389,31 @@ class _AppShellState extends State<_AppShell> {
       case ActiveTab.community:
         return const CommunityPage();
       case ActiveTab.profile:
-        return const ProfilePage();
+        return ProfilePage(
+          onOpenAuth: (isLogin) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => AuthPage(
+                  onLogin: () => setState(() {
+                    isAuthenticated = true;
+                    useGuestMode = false;
+                    activeTab = ActiveTab.dashboard;
+                    isCapturingNote = false;
+                    _viewingNote = null;
+                  }),
+                  onGuest: () => setState(() {
+                    isAuthenticated = true;
+                    useGuestMode = true;
+                    activeTab = ActiveTab.dashboard;
+                    isCapturingNote = false;
+                    _viewingNote = null;
+                  }),
+                  initialIsLogin: isLogin,
+                ),
+              ),
+            );
+          },
+        );
     }
   }
 
@@ -561,7 +604,22 @@ class _AppShellState extends State<_AppShell> {
   @override
   Widget build(BuildContext context) {
     if (!isAuthenticated) {
-      return AuthPage(onLogin: () => setState(() => isAuthenticated = true));
+      return AuthPage(
+        onLogin: () => setState(() {
+          isAuthenticated = true;
+          useGuestMode = false;
+          activeTab = ActiveTab.dashboard;
+          isCapturingNote = false;
+          _viewingNote = null;
+        }),
+        onGuest: () => setState(() {
+          isAuthenticated = true;
+          useGuestMode = true;
+          activeTab = ActiveTab.dashboard;
+          isCapturingNote = false;
+          _viewingNote = null;
+        }),
+      );
     }
 
     return LayoutBuilder(

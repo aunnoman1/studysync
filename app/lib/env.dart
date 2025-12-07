@@ -6,4 +6,10 @@ class Env {
 
   static String get embeddingUrl =>
       dotenv.env['EMBED_URL'] ?? 'http://localhost:8001';
+
+  static String get supabaseUrl =>
+      dotenv.env['SUPABASE_URL'] ?? 'https://project-id.supabase.co';
+
+  static String get supabaseAnonKey =>
+      dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 }

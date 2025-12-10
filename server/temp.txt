@@ -2,11 +2,12 @@
 AI Tutor Response
 ================================================================================
 Question: what is function
-Timestamp: 2025-12-10 19:40:02.347686
+Timestamp: 2025-12-10T20:56:30.809511
+Number of contexts used: 5
 
---------------------------------------------------------------------------------
+================================================================================
 PROMPT SENT TO LLM:
---------------------------------------------------------------------------------
+================================================================================
 You are an assistant answering questions using the provided context.
 Question: what is function
 Context:
@@ -74,173 +75,70 @@ purpose of the programs, that is, the meaning of the statements. (We will elabor
 on how to include comments in a program later in this chapter.) The next line of the 
 program, that is,
 #include <iostream>
-[6] (Local) Functional dependencies
-Named forms
-1NF
-2NF
-3NF
-| better
-BLNF
-4NF
-5NF
-| v
-If one attribute is first and then
-any superset of first will be first
-second.
-Eg.
-A B C
-ABC
-ABC
-[7] (Local) assembly )( DNA seq ) . For annotation go
-to GTF or GIT and download gtf.gz .
-· After downloading open terminal on OS
-L> to make STAR is installed properly
-type STAR and enter.
-L> command :
-STAR
---runthreadN
-8 and choose a
-{ Command
-number lower
-STAR --runthreadN 8 --runMale
-than that.
-genomeGenerate ->
-->to check threads go to activity -> system )
-monitor -> Resources -> CPU
---genomeDir Tuesday address
-full command on
-next page.
-where
-indicated
-genome
-home / User / school / & cloud
-be sure to pass user
-name as well.
-[8] (Local) Dated
-of noise and help in reds transcript count
-estimation. SAVER is an UMI-based tool
-that is efficient and accurate for transcript
-quantification. STAR-solo does it automatically
-? Process of Alignment, De-duplication and
-quantification.
-· Generate STAR reference genome index for
-STAR alignur. Need to download the
-respective refunce genome and annotation.
-The index allow mapping.
-· Download through wget.
-· Go to ensemble -> www. ensemble . org -> Human
-or your specie -> download reference annotation
-( GTF format ) and ref. genome ( primary
-assembly )( DNA seq ) . For annotation go
-to GTF or GIT and download gtf.gz .
-· After downloading open terminal on OS
-[9] (Local | title: OOP Concepts) assembly )( DNA seq ) . For annotation go
-to GTF or GIT and download gtf.gz .
-· After downloading open terminal on OS
-L> to make STAR is installed properly
-type STAR and enter.
-L> command :
-STAR
---runthreadN
-8 and choose a
-{ Command
-number lower
-STAR --runthreadN 8 --runMale
-than that.
-genomeGenerate ->
-->to check threads go to activity -> system )
-monitor -> Resources -> CPU
---genomeDir Tuesday address
-full command on
-next page.
-where
-indicated
-genome
-home / User / school / & cloud
-be sure to pass user
-name as well.
-[10] (Local | title: OOP Concepts) Dated
-of noise and help in reds transcript count
-estimation. SAVER is an UMI-based tool
-that is efficient and accurate for transcript
-quantification. STAR-solo does it automatically
-? Process of Alignment, De-duplication and
-quantification.
-· Generate STAR reference genome index for
-STAR alignur. Need to download the
-respective refunce genome and annotation.
-The index allow mapping.
-· Download through wget.
-· Go to ensemble -> www. ensemble . org -> Human
-or your specie -> download reference annotation
-( GTF format ) and ref. genome ( primary
-assembly )( DNA seq ) . For annotation go
-to GTF or GIT and download gtf.gz .
-· After downloading open terminal on OS
-[11] (Local) assembly )( DNA seq ) . For annotation go
-to GTF or GIT and download gtf.gz .
-· After downloading open terminal on OS
-L> to make STAR is installed properly
-type STAR and enter.
-L> command :
-STAR
---runthreadN
-8 and choose a
-{ Command
-number lower
-STAR --runthreadN 8 --runMale
-than that.
-genomeGenerate ->
-->to check threads go to activity -> system )
-monitor -> Resources -> CPU
---genomeDir Tuesday address
-full command on
-next page.
-where
-indicated
-genome
-home / User / school / & cloud
-be sure to pass user
-name as well.
-[12] (Local) Dated
-of noise and help in reds transcript count
-estimation. SAVER is an UMI-based tool
-that is efficient and accurate for transcript
-quantification. STAR-solo does it automatically
-? Process of Alignment, De-duplication and
-quantification.
-· Generate STAR reference genome index for
-STAR alignur. Need to download the
-respective refunce genome and annotation.
-The index allow mapping.
-· Download through wget.
-· Go to ensemble -> www. ensemble . org -> Human
-or your specie -> download reference annotation
-( GTF format ) and ref. genome ( primary
-assembly )( DNA seq ) . For annotation go
-to GTF or GIT and download gtf.gz .
-· After downloading open terminal on OS
-[13] (Local) Functional dependencies
-Named forms
-1NF
-2NF
-3NF
-| better
-BLNF
-4NF
-5NF
-| v
-If one attribute is first and then
-any superset of first will be first
-second.
-Eg.
-A B C
-ABC
-ABC
 Answer concisely based only on the context above.
 
---------------------------------------------------------------------------------
+================================================================================
 LLM RESPONSE:
---------------------------------------------------------------------------------
-to be integrated
+================================================================================
+ This program defines functions, both predefined and user-defined. It also includes comments, which are used to provide additional information about the code. The purpose of this program is to teach users how to use functions in C11.
+[6]  (Supabase) a function can have several statements; it does not need to contain only one statement. In the preceding example, the function main has three statements: a declaration that includes the type (T) and number (N) of parameters that may be used by the function, an initial value for the parameter, and a pair of symbols ~~ 
+// ~~that is, two backslashes followed by each other. These are comments.
+
+You can use the ~~ symbols to include multiple lines in a comment.
+[7]  (Supabase) predefined functions are those which have been written for you and used many times. You don’t write them yourself; they were written once, packaged, and distributed with the standard C11 program. They contain their own set of instructions or statements, but you need not write any statements to use them. You only have to remember the name of the header file that includes the function you want to use.
+The following is a list of standard functions in C11:
+1    int
+int  (Supabase) defines an integer type. An integer is an integral number that is either 
+positive or negative but never non-integer. For example, 5 and -3 are integers; 3.14 
+is not because it is a decimal fraction.
+2    double
+double  (Supabase) defines a floating-point type. This type stores floating-point numbers. 
+These types are used to store real numbers that have decimals in them, but the number 
+can also be positive or negative. For example, 
+float x = 3; // x is assigned the value of an integer: 3
+3    int i
+int  (Supabase) defines an integer type as we stated earlier.
+4    long int
+long int (Supabase) defines a larger integer type called long integer. Long integers can 
+be used to store even larger numbers than integers, but these values are typically not 
+used in practice because the number of digits required is very large for such 
+large numbers.
+5    char
+char  (Supabase) defines an 8-bit signed character type, which is usually sufficient to 
+store single characters and some ASCII symbols. It allows a single byte in memory to 
+contain one character that can be used by the operating system as part of its data 
+structures and stored on disk for later use.
+6    bool
+bool (Supabase) defines a type whose values are either true or false, which we call 
+Boolean. This is often referred to as a logical type because it can be used in logical 
+operations such as the AND and OR operators.
+7    void
+void  (Supabase) defines an empty function that does not return any value. Any statement 
+in this function can only execute if you have already called the function first. The 
+program must include a pair of symbols that is used to indicate the end of statements in 
+this type of function. These are the symbol }; followed by another ; ~~ ~~that is, two 
+backslashes followed by each other. To define this kind of function, 
+void main (int argc, char *argv[]) { } ~~ ~~would be used; here, ~~ ~~is a pair of 
+backslashes followed by each other; } means the end of statements in a void type.
+8    unsigned int
+unsigned int (Supabase) defines an integer type whose values are either 0 or greater than zero. 
+9    char[]
+char []  (Supabase) defines a character array, which is simply an array of characters. 
+The size of the array is indicated by its length, and each element in the array has 
+its own index number. You can store as many elements into this type of function as you 
+would like. You must include the ~~ symbol after the name of the type to indicate that 
+the statement on the following line is a comment, not part of the program. This 
+statement indicates how many characters will be in the array: ~~char size[];.
+The variable char *argv[] has been used above as an example of parameters; these are 
+variables with types that can hold values from inside the function to outside it. In the 
+previous line, the value char [ ] was passed into the function, where the first argument is
+the number of characters in the array and the second parameter is the array itself, which 
+is called a pointer; this is shown by the variable *argv. It can be used to pass data 
+between functions or between a program and an external tool such as a calculator.
+10    unsigned int x
+unsigned int x (Supabase) ~~(1) is similar to integer type, but it has only positive values.
+11    double y = 3.14; // Assigns the value of 3.14 to the variable y, which can be used later in the program
+double y ~~(2) ~~(3) ~~(4) is a floating-point type that stores real numbers with decimals.
+
+
 ================================================================================

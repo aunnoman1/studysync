@@ -1,9 +1,11 @@
 import os
+import math
 from typing import Any, Dict, List, Optional, Callable
 
 import httpx
 from fastapi import HTTPException, FastAPI
 from pydantic import BaseModel, Field
+from langchain_ollama import OllamaLLM
 
 try:
     from dotenv import load_dotenv  # type: ignore
@@ -45,17 +47,51 @@ class AskResponse(BaseModel):
     message: str  # LLM-generated response to the question
 
 
-async def _call_llm_dummy(prompt: str, question: str) -> str:
+# Initialize Ollama LLM (lazy loading)
+_llm: Optional[OllamaLLM] = None
+
+def _get_llm() -> OllamaLLM:
+    """Get or create the Ollama LLM instance."""
+    global _llm
+    if _llm is None:
+        model_name = os.getenv("OLLAMA_MODEL", "phi")
+        _llm = OllamaLLM(model=model_name)
+    return _llm
+
+
+async def _call_llm(prompt: str, question: str) -> str:
     """
-    Dummy LLM function for development.
-    In production, this will call your actual LLM API (OpenAI, Anthropic, etc.)
+    Call Ollama LLM with the given prompt.
+    Uses the model specified in OLLAMA_MODEL env var (default: phi).
     """
-    # Simulate LLM processing delay
-    import asyncio
-    await asyncio.sleep(0.5)
-    
-    # Return a simple dummy message
-    return "to be integrated"
+    try:
+        llm = _get_llm()
+        # Run LLM in thread pool since it's synchronous
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            response = await loop.run_in_executor(
+                executor,
+                lambda: llm.invoke(prompt)
+            )
+        return str(response.content if hasattr(response, 'content') else response)
+    except Exception as e:
+        print(f"[ERROR] LLM call failed: {e}")
+        raise HTTPException(status_code=500, detail=f"LLM call failed: {e}") from e
+
+
+def _cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    if len(vec1) != len(vec2) or len(vec1) == 0:
+        return 0.0
+    dot = sum(a * b for a, b in zip(vec1, vec2))
+    mag1 = math.sqrt(sum(a * a for a in vec1))
+    mag2 = math.sqrt(sum(b * b for b in vec2))
+    if mag1 == 0 or mag2 == 0:
+        return 0.0
+    return dot / (mag1 * mag2)
 
 
 async def _supabase_match(
@@ -129,23 +165,39 @@ def register_ask_routes(app: FastAPI, embed_text_fn: Callable[[str], List[float]
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"Supabase call failed: {e}") from e
 
-        # Local chunks from client (no server-side scoring)
+        # Local chunks from client - score them using embeddings
         local_hits: List[AskContext] = []
         for lc in req.local_chunks:
             txt = (lc.text or "").strip()
             if not txt:
                 continue
+            # Embed the local chunk text and compute similarity with query
+            try:
+                chunk_vec = embed_text_fn(txt)
+                similarity = _cosine_similarity(q_vec, chunk_vec)
+            except Exception as e:
+                print(f"[WARNING] Failed to score local chunk: {e}")
+                similarity = 0.0  # Fallback to 0 if embedding fails
+            
             local_hits.append(
                 AskContext(
                     source="local",
                     text=txt,
-                    score=1.0,  # client-provided; not re-scored here
+                    score=similarity,  # Now properly scored
                     note_title=lc.note_title,
                     note_id=lc.note_id,
                 )
             )
+        
+        # Sort local hits by score (descending)
+        local_hits.sort(key=lambda h: h.score, reverse=True)
 
+        # Combine and sort all contexts by score (descending)
         contexts = supa_hits + local_hits
+        contexts.sort(key=lambda h: h.score, reverse=True)
+        
+        # Keep only top 5 highest scoring contexts
+        contexts = contexts[:5]
 
         prompt_lines = [
             "You are an assistant answering questions using the provided context.",
@@ -159,30 +211,35 @@ def register_ask_routes(app: FastAPI, embed_text_fn: Callable[[str], List[float]
         prompt_lines.append("Answer concisely based only on the context above.")
         prompt = "\n".join(prompt_lines)
 
-        # Send prompt to LLM (dummy function for now)
-        llm_response = await _call_llm_dummy(prompt, question)
+        # Send prompt to LLM
+        llm_response = await _call_llm(prompt, question)
         print(f"[DEBUG] LLM response length: {len(llm_response)}")
         print(f"[DEBUG] LLM response preview: {llm_response[:100]}...")
         
-        # Dump response to temp.txt for debugging/integration
+        # Dump prompt and response to temp.txt for debugging/integration
         try:
+            from datetime import datetime
             with open("temp.txt", "w", encoding="utf-8") as f:
                 f.write("=" * 80 + "\n")
                 f.write("AI Tutor Response\n")
                 f.write("=" * 80 + "\n")
                 f.write(f"Question: {question}\n")
-                f.write(f"Timestamp: {__import__('datetime').datetime.now()}\n\n")
-                f.write("-" * 80 + "\n")
-                f.write("PROMPT SENT TO LLM:\n")
-                f.write("-" * 80 + "\n")
-                f.write(prompt + "\n\n")
-                f.write("-" * 80 + "\n")
-                f.write("LLM RESPONSE:\n")
-                f.write("-" * 80 + "\n")
-                f.write(llm_response + "\n")
+                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                f.write(f"Number of contexts used: {len(contexts)}\n\n")
                 f.write("=" * 80 + "\n")
+                f.write("PROMPT SENT TO LLM:\n")
+                f.write("=" * 80 + "\n")
+                f.write(prompt)
+                f.write("\n\n")
+                f.write("=" * 80 + "\n")
+                f.write("LLM RESPONSE:\n")
+                f.write("=" * 80 + "\n")
+                f.write(llm_response)
+                f.write("\n")
+                f.write("=" * 80 + "\n")
+            print(f"[DEBUG] Saved prompt and response to temp.txt")
         except Exception as e:
-            print(f"Warning: Failed to write to temp.txt: {e}")
+            print(f"[WARNING] Failed to write to temp.txt: {e}")
         
         response = AskResponse(message=llm_response)
         print(f"[DEBUG] Returning response with message length: {len(response.message)}")

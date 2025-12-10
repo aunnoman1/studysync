@@ -68,7 +68,7 @@ class _AppShellState extends State<_AppShell> {
   @override
   void initState() {
     super.initState();
-    _askService = AskService(baseUrl: Env.embeddingUrl);
+    _askService = AskService(baseUrl: Env.askUrl);
     // Load persisted notes
     final loaded = widget.db.noteBox.getAll();
     loaded.sort((a, b) => b.createdAt.compareTo(a.createdAt));

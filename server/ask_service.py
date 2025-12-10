@@ -1,6 +1,7 @@
 import os
 import math
-from typing import Any, Dict, List, Optional, Callable
+import inspect
+from typing import Any, Dict, List, Optional, Callable, Union, Awaitable
 
 import httpx
 from fastapi import HTTPException, FastAPI
@@ -144,7 +145,14 @@ async def _supabase_match(
     return hits
 
 
-def register_ask_routes(app: FastAPI, embed_text_fn: Callable[[str], List[float]]):
+async def _call_embed(fn: Callable[[str], Union[List[float], Awaitable[List[float]]]], text: str) -> List[float]:
+    res = fn(text)
+    if inspect.isawaitable(res):
+        return await res
+    return res
+
+
+def register_ask_routes(app: FastAPI, embed_text_fn: Callable[[str], Union[List[float], Awaitable[List[float]]]]):
     @app.post("/ask", response_model=AskResponse)
     async def ask(req: AskRequest) -> AskResponse:
         question = (req.question or "").strip()
@@ -152,7 +160,7 @@ def register_ask_routes(app: FastAPI, embed_text_fn: Callable[[str], List[float]
             raise HTTPException(status_code=400, detail="question must be non-empty")
 
         try:
-            q_vec = embed_text_fn(question)
+            q_vec = await _call_embed(embed_text_fn, question)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Question embedding failed: {e}") from e
 
@@ -173,7 +181,7 @@ def register_ask_routes(app: FastAPI, embed_text_fn: Callable[[str], List[float]
                 continue
             # Embed the local chunk text and compute similarity with query
             try:
-                chunk_vec = embed_text_fn(txt)
+                chunk_vec = await _call_embed(embed_text_fn, txt)
                 similarity = _cosine_similarity(q_vec, chunk_vec)
             except Exception as e:
                 print(f"[WARNING] Failed to score local chunk: {e}")
@@ -199,18 +207,52 @@ def register_ask_routes(app: FastAPI, embed_text_fn: Callable[[str], List[float]
         # Keep only top 5 highest scoring contexts
         contexts = contexts[:5]
 
-        prompt_lines = [
-            "You are an assistant answering questions using the provided context.",
-            f"Question: {question}",
-            "Context:",
-        ]
-        for i, ctx in enumerate(contexts, start=1):
-            prefix = "Supabase" if ctx.source == "supabase" else "Local"
-            title = f" | title: {ctx.note_title}" if ctx.note_title else ""
-            prompt_lines.append(f"[{i}] ({prefix}{title}) {ctx.text}")
-        prompt_lines.append("Answer concisely based only on the context above.")
-        prompt = "\n".join(prompt_lines)
+        # 1. Format the context chunks first
+        # We separate metadata (Source/Title) from content so the LLM knows what is what.
+        context_text = ""
+        for ctx in contexts:
+            context_text += f"{ctx.text}\n\n"
+        
+        # 2. Construct the V3 "Teacher Persona" Prompt
+        prompt = f"""
+### ROLE
+You are a passionate Computer Science Professor. You are explaining a concept to a student during office hours. 
 
+### CONTEXT (INTERNAL MEMORY)
+The following text is your internal knowledge. You must teach these concepts as if you have known them for years. 
+**DO NOT** refer to this text as "the context," "the book," or "the notes."
+
+<internal_memory>
+{context_text}
+</internal_memory>
+
+### STUDENT QUESTION
+{question}
+
+### STRICT STYLE RULES
+1. **Absolute Prohibition on Meta-Talk:**
+   - NEVER use phrases like: "Based on the provided knowledge", "According to the text", "In the examples provided", "As seen in Example 10-6".
+   - If the text says "In Example 10-6 we see...", you must rewrite it to: "For instance, consider a case where..."
+
+2. **Claim the Examples:**
+   - If the context contains a code example, present it as *your* example. 
+   - BAD: "The text shows an inventory class."
+   - GOOD: "Let's look at an inventory class to understand this."
+
+3. **Tone:** Conversational, confident, and direct.
+
+### OUTPUT FORMAT
+(Start directly with the answer. Do not use introductory filler.)
+
+### EXAMPLES OF BEHAVIOR
+**Input Context:** "Figure 4.2 in the textbook shows that recursion uses the stack."
+**Bad Response:** "According to Figure 4.2 in the provided text, recursion uses the stack."
+**Good Response:** "Recursion relies heavily on the call stack to manage function states."
+
+**Input Context:** "User notes: frequent crashes on Pixel 9."
+**Bad Response:** "Your notes mention the Pixel 9 crashes."
+**Good Response:** "The Pixel 9 has known stability issues regarding frequent crashes."
+"""
         # Send prompt to LLM
         llm_response = await _call_llm(prompt, question)
         print(f"[DEBUG] LLM response length: {len(llm_response)}")
@@ -245,3 +287,39 @@ def register_ask_routes(app: FastAPI, embed_text_fn: Callable[[str], List[float]
         print(f"[DEBUG] Returning response with message length: {len(response.message)}")
         return response
 
+
+if __name__ == "__main__":
+    import uvicorn
+
+    async def remote_embed_text(text: str) -> List[float]:
+        # Connect to embedding service
+        # Default to localhost:8001 if not specified
+        emb_url = os.getenv("EMBEDDING_SERVER_URL", "http://localhost:8001")
+        # Remove trailing slash if present
+        if emb_url.endswith("/"):
+            emb_url = emb_url[:-1]
+            
+        async with httpx.AsyncClient() as client:
+            # We assume embedding service endpoint is /embedding/embed
+            # server/embedding_service.py has: @app.post("/embedding/embed")
+            resp = await client.post(
+                f"{emb_url}/embedding/embed",
+                json={"text": text},
+                timeout=30.0
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["vector"]
+
+    app = FastAPI(title="Ask Service Standalone")
+    
+    register_ask_routes(app, remote_embed_text)
+    
+    host = os.getenv("HOST", "0.0.0.0")
+    # Default to 8002 to avoid conflict with embedding service (8001) and main (8000)
+    port = int(os.getenv("ASK_PORT", "8002"))
+    
+    print(f"Starting Ask Service on {host}:{port}")
+    print(f"Using Embedding Service at: {os.getenv('EMBEDDING_SERVER_URL', 'http://localhost:8001')}")
+    
+    uvicorn.run(app, host=host, port=port)

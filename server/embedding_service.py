@@ -15,7 +15,7 @@ except Exception:
 
 from sentence_transformers import SentenceTransformer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from ask_service import register_ask_routes
+
 
 # ----------------------------
 # Config / Globals
@@ -162,7 +162,6 @@ def _embed_text(text: str) -> List[float]:
     return _to_float_list(emb)
 
 
-register_ask_routes(app, _embed_text)
 
 
 if __name__ == "__main__":

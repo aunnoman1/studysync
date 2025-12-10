@@ -15,6 +15,7 @@ except Exception:
 
 from sentence_transformers import SentenceTransformer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from ask_service import register_ask_routes
 
 # ----------------------------
 # Config / Globals
@@ -22,7 +23,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 device = "cuda" if torch.cuda.is_available() else "cpu"
 MODEL_PATH = os.getenv(
     "EMB_MODEL_PATH",
-    os.path.join("server", "models", "embedding"),
+    os.path.join("models", "embedding"),
 )
 MODEL_NAME = os.path.basename(MODEL_PATH)
 
@@ -151,6 +152,17 @@ async def chunk_and_embed(req: ChunkAndEmbedRequest) -> JSONResponse:
         return JSONResponse({"embeddings": out, "dim": dim, "count": len(out), "model": MODEL_NAME})
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chunk+embed failed: {e}") from e
+
+
+# Register /ask routes
+def _embed_text(text: str) -> List[float]:
+    """Helper function to embed text using the loaded model."""
+    model = _require_model()
+    emb = model.encode(text, convert_to_tensor=False, device=device, show_progress_bar=False)
+    return _to_float_list(emb)
+
+
+register_ask_routes(app, _embed_text)
 
 
 if __name__ == "__main__":

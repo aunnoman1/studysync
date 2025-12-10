@@ -1,0 +1,246 @@
+================================================================================
+AI Tutor Response
+================================================================================
+Question: what is function
+Timestamp: 2025-12-10 19:40:02.347686
+
+--------------------------------------------------------------------------------
+PROMPT SENT TO LLM:
+--------------------------------------------------------------------------------
+You are an assistant answering questions using the provided context.
+Question: what is function
+Context:
+[1] (Supabase) This chapter first discusses the functions previously defined and then discusses user-
+defined functions.
+Let us imagine an automobile factory. When an automobile is manufactured, it is 
+not made from basic raw materials; it is put together from previously manufactured 
+parts. Some parts are made by the company itself; others, by different companies.
+Functions are like building blocks. They let you divide complicated programs into 
+manageable pieces. They have other advantages, too:
+??
+While working on one function, you can focus on just that part of the
+[2] (Supabase) Functions are often called modules. They are like miniature programs; you can put 
+them together to form a larger program. When user-defined functions are discussed, 
+you will see that this is the case. This ability is less apparent with predefined functions 
+because their programming code is not available to us. However, because predefined 
+functions are already written for us, you will learn these first so that you can use them 
+when needed.
+Predefined Functions
+Before formally discussing predefined functions in C11, let us review a concept
+[3] (Supabase) QUICK REVIEW
+1.	
+Functions, also called modules, are like miniature programs.
+2.	
+Functions enable you to divide a program into manageable tasks.
+3.	
+The C11 system provides the standard (predefined) functions.
+4.	
+To use a standard function, you must
+ i.  Know the name of the header file that contains the function’s 
+specification,
+ ii.  Include that header file in the program, and
+iii.  Know the name and type of the function and number and types of 
+the parameters (arguments).
+5.	
+There are two types of user-defined functions: value-returning func-
+tions and void functions.
+6.
+[4] (Supabase) f x
+x
+
+1 , then (1)
+
+f
+5 , 
+(2)
+
+f
+5 , and (3)
+
+f
+
+, where 1, 2, and 3 are the arguments of the function f, and 7, 
+9, and 11 are the corresponding values of f.
+In C11, the concept of a function, either predefined or user-defined, is similar to 
+that of a function in algebra. For example, every function has a name and, depending 
+on the values specified by the user, it does some computation. This section discusses 
+various predefined functions.
+[5] (Supabase) a function is a set of statements whose objective is to accomplish something. The 
+preceding program consists of only the function main; all C11 programs require the 
+function main.
+The first four lines of the program begins with the pair of symbols // (shown in 
+green), which are comments. Comments are for the user; they typically explain the 
+purpose of the programs, that is, the meaning of the statements. (We will elaborate 
+on how to include comments in a program later in this chapter.) The next line of the 
+program, that is,
+#include <iostream>
+[6] (Local) Functional dependencies
+Named forms
+1NF
+2NF
+3NF
+| better
+BLNF
+4NF
+5NF
+| v
+If one attribute is first and then
+any superset of first will be first
+second.
+Eg.
+A B C
+ABC
+ABC
+[7] (Local) assembly )( DNA seq ) . For annotation go
+to GTF or GIT and download gtf.gz .
+· After downloading open terminal on OS
+L> to make STAR is installed properly
+type STAR and enter.
+L> command :
+STAR
+--runthreadN
+8 and choose a
+{ Command
+number lower
+STAR --runthreadN 8 --runMale
+than that.
+genomeGenerate ->
+->to check threads go to activity -> system )
+monitor -> Resources -> CPU
+--genomeDir Tuesday address
+full command on
+next page.
+where
+indicated
+genome
+home / User / school / & cloud
+be sure to pass user
+name as well.
+[8] (Local) Dated
+of noise and help in reds transcript count
+estimation. SAVER is an UMI-based tool
+that is efficient and accurate for transcript
+quantification. STAR-solo does it automatically
+? Process of Alignment, De-duplication and
+quantification.
+· Generate STAR reference genome index for
+STAR alignur. Need to download the
+respective refunce genome and annotation.
+The index allow mapping.
+· Download through wget.
+· Go to ensemble -> www. ensemble . org -> Human
+or your specie -> download reference annotation
+( GTF format ) and ref. genome ( primary
+assembly )( DNA seq ) . For annotation go
+to GTF or GIT and download gtf.gz .
+· After downloading open terminal on OS
+[9] (Local | title: OOP Concepts) assembly )( DNA seq ) . For annotation go
+to GTF or GIT and download gtf.gz .
+· After downloading open terminal on OS
+L> to make STAR is installed properly
+type STAR and enter.
+L> command :
+STAR
+--runthreadN
+8 and choose a
+{ Command
+number lower
+STAR --runthreadN 8 --runMale
+than that.
+genomeGenerate ->
+->to check threads go to activity -> system )
+monitor -> Resources -> CPU
+--genomeDir Tuesday address
+full command on
+next page.
+where
+indicated
+genome
+home / User / school / & cloud
+be sure to pass user
+name as well.
+[10] (Local | title: OOP Concepts) Dated
+of noise and help in reds transcript count
+estimation. SAVER is an UMI-based tool
+that is efficient and accurate for transcript
+quantification. STAR-solo does it automatically
+? Process of Alignment, De-duplication and
+quantification.
+· Generate STAR reference genome index for
+STAR alignur. Need to download the
+respective refunce genome and annotation.
+The index allow mapping.
+· Download through wget.
+· Go to ensemble -> www. ensemble . org -> Human
+or your specie -> download reference annotation
+( GTF format ) and ref. genome ( primary
+assembly )( DNA seq ) . For annotation go
+to GTF or GIT and download gtf.gz .
+· After downloading open terminal on OS
+[11] (Local) assembly )( DNA seq ) . For annotation go
+to GTF or GIT and download gtf.gz .
+· After downloading open terminal on OS
+L> to make STAR is installed properly
+type STAR and enter.
+L> command :
+STAR
+--runthreadN
+8 and choose a
+{ Command
+number lower
+STAR --runthreadN 8 --runMale
+than that.
+genomeGenerate ->
+->to check threads go to activity -> system )
+monitor -> Resources -> CPU
+--genomeDir Tuesday address
+full command on
+next page.
+where
+indicated
+genome
+home / User / school / & cloud
+be sure to pass user
+name as well.
+[12] (Local) Dated
+of noise and help in reds transcript count
+estimation. SAVER is an UMI-based tool
+that is efficient and accurate for transcript
+quantification. STAR-solo does it automatically
+? Process of Alignment, De-duplication and
+quantification.
+· Generate STAR reference genome index for
+STAR alignur. Need to download the
+respective refunce genome and annotation.
+The index allow mapping.
+· Download through wget.
+· Go to ensemble -> www. ensemble . org -> Human
+or your specie -> download reference annotation
+( GTF format ) and ref. genome ( primary
+assembly )( DNA seq ) . For annotation go
+to GTF or GIT and download gtf.gz .
+· After downloading open terminal on OS
+[13] (Local) Functional dependencies
+Named forms
+1NF
+2NF
+3NF
+| better
+BLNF
+4NF
+5NF
+| v
+If one attribute is first and then
+any superset of first will be first
+second.
+Eg.
+A B C
+ABC
+ABC
+Answer concisely based only on the context above.
+
+--------------------------------------------------------------------------------
+LLM RESPONSE:
+--------------------------------------------------------------------------------
+to be integrated
+================================================================================

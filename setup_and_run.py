@@ -3,6 +3,8 @@ import sys
 import os
 import time
 import shutil
+import urllib.request
+import urllib.error
 
 def run_command(command, cwd=None, shell=True):
     """Run a shell command and print output in real-time."""
@@ -31,37 +33,9 @@ def run_command(command, cwd=None, shell=True):
         print(f"Failed to execute command: {e}")
         sys.exit(1)
 
-def get_venv_python():
-    """Create a virtual environment if not exists and return the python executable path."""
-    venv_dir = os.path.join(os.getcwd(), ".venv")
-    
-    # Determine python executable path in venv
-    if sys.platform == "win32":
-        python_executable = os.path.join(venv_dir, "Scripts", "python.exe")
-    else:
-        python_executable = os.path.join(venv_dir, "bin", "python")
-
-    # Create venv if it doesn't exist
-    if not os.path.exists(venv_dir):
-        print(f"Creating virtual environment at {venv_dir}...")
-        subprocess.check_call([sys.executable, "-m", "venv", venv_dir])
-        
-        # Upgrade pip immediately
-        print("Upgrading pip in virtual environment...")
-        subprocess.check_call([python_executable, "-m", "pip", "install", "--upgrade", "pip"])
-    
-    return python_executable
-
 def check_ollama_ready(url="http://localhost:11434"):
     """Poll Ollama until it's ready. Note: We use requests from the venv."""
     print("Waiting for Ollama to be ready...")
-    
-    # Simple retry logic using urllib to avoid venv dependency chicken-and-egg for this check
-    # But since we install requests in step 0, we can use it if we run this script WITH the venv python.
-    # However, this script is likely the ENTRY POINT. 
-    # Simpler approach: Use urllib (std lib) for the health check.
-    import urllib.request
-    import urllib.error
     
     for _ in range(30):  # Wait up to 30 seconds
         try:
@@ -78,13 +52,9 @@ def main():
     server_dir = os.path.join(base_dir, "server")
     docker_dir = os.path.join(base_dir, "docker")
     
-    # 0. Setup Virtual Environment and Dependencies
-    print("\n=== 0. Setting up Virtual Environment ===")
-    venv_python = get_venv_python()
-    
-    print("Checking dependencies in virtual environment...")
-    # Install requests (for script use) and model downloaders
-    run_command(f"{venv_python} -m pip install requests sentence-transformers transformers torch", cwd=base_dir)
+    # Note: We assume this script is running inside the venv created by setup.sh/setup.bat
+    # So we can use 'python' directly to refer to the venv python.
+    python_cmd = sys.executable
 
     # 1. Download Local Models
     print("\n=== 1. Checking/Downloading Local Models ===")
@@ -95,13 +65,13 @@ def main():
     
     if not os.path.exists(emb_model_path):
         print("Downloading Embedding Model...")
-        run_command(f"{venv_python} emb-download.py", cwd=server_dir)
+        run_command(f"{python_cmd} emb-download.py", cwd=server_dir)
     else:
         print(f"Embedding model found at {emb_model_path}")
 
     if not os.path.exists(ocr_model_path):
         print("Downloading OCR Model...")
-        run_command(f"{venv_python} ocr-download.py", cwd=server_dir)
+        run_command(f"{python_cmd} ocr-download.py", cwd=server_dir)
     else:
         print(f"OCR model found at {ocr_model_path}")
 

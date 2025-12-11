@@ -9,12 +9,14 @@ import 'pages/note_photo_view_page.dart';
 import 'pages/ai_tutor_page.dart';
 import 'pages/community_page.dart';
 import 'pages/profile_page.dart';
+import 'pages/search_page.dart';
 import 'theme.dart';
 import 'widgets/sidebar.dart';
 import 'objectbox.dart';
 import 'services/ocr_service.dart';
 import 'services/embedding_service.dart';
 import 'services/ask_service.dart';
+import 'services/search_service.dart';
 import 'dart:typed_data';
 import 'objectbox.g.dart';
 import 'env.dart';
@@ -64,11 +66,16 @@ class _AppShellState extends State<_AppShell> {
   final Set<int> _embInProgress = <int>{};
   final Set<int> _embFailed = <int>{};
   late final AskService _askService;
+  late final SearchService _searchService;
 
   @override
   void initState() {
     super.initState();
     _askService = AskService(baseUrl: Env.askUrl);
+    _searchService = SearchService(
+      db: widget.db,
+      embeddingService: EmbeddingService(baseUrl: Env.embeddingUrl),
+    );
     // Load persisted notes
     final loaded = widget.db.noteBox.getAll();
     loaded.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -386,6 +393,17 @@ class _AppShellState extends State<_AppShell> {
           capturedNotes: _notes,
           onOpenCaptured: _openCaptured,
           onDeleteCaptured: _deleteCaptured,
+        );
+      case ActiveTab.search:
+        return SearchPage(
+          searchService: _searchService,
+          onOpenNote: (note) {
+            setState(() {
+              // Switch to "My Notes" tab context but open the specific note
+              activeTab = ActiveTab.myNotes;
+            });
+            _openCaptured(note);
+          },
         );
       case ActiveTab.aiTutor:
         return AITutorPage(

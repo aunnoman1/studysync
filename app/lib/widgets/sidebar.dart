@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 
-enum ActiveTab { dashboard, myNotes, aiTutor, community, profile }
+enum ActiveTab { dashboard, myNotes, search, aiTutor, community, profile }
 
 class Sidebar extends StatelessWidget {
   final ActiveTab activeTab;
@@ -29,6 +29,11 @@ class Sidebar extends StatelessWidget {
         id: ActiveTab.myNotes,
         label: 'My Notes',
         icon: Icons.description_outlined,
+      ),
+      _NavItem(
+        id: ActiveTab.search,
+        label: 'Search',
+        icon: Icons.search_outlined,
       ),
       _NavItem(
         id: ActiveTab.aiTutor,

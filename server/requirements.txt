@@ -8,3 +8,6 @@ accelerate
 python-dotenv
 sentence-transformers
 langchain-text-splitters
+httpx
+langchain-ollama
+langchain-core

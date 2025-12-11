@@ -14,6 +14,7 @@ import 'widgets/sidebar.dart';
 import 'objectbox.dart';
 import 'services/ocr_service.dart';
 import 'services/embedding_service.dart';
+import 'services/ask_service.dart';
 import 'dart:typed_data';
 import 'objectbox.g.dart';
 import 'env.dart';
@@ -62,10 +63,12 @@ class _AppShellState extends State<_AppShell> {
   final Set<int> _ocrFailed = <int>{};
   final Set<int> _embInProgress = <int>{};
   final Set<int> _embFailed = <int>{};
+  late final AskService _askService;
 
   @override
   void initState() {
     super.initState();
+    _askService = AskService(baseUrl: Env.askUrl);
     // Load persisted notes
     final loaded = widget.db.noteBox.getAll();
     loaded.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -385,7 +388,10 @@ class _AppShellState extends State<_AppShell> {
           onDeleteCaptured: _deleteCaptured,
         );
       case ActiveTab.aiTutor:
-        return const AITutorPage();
+        return AITutorPage(
+          db: widget.db,
+          askService: _askService,
+        );
       case ActiveTab.community:
         return const CommunityPage();
       case ActiveTab.profile:

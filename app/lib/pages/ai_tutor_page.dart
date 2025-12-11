@@ -7,10 +7,13 @@ import '../models/note_record.dart';
 import '../objectbox.g.dart';
 
 class AITutorPage extends StatefulWidget {
+  final String? initialQuery;
+
   const AITutorPage({
     super.key,
     required this.db,
     required this.askService,
+    this.initialQuery,
   });
 
   final ObjectBox db;
@@ -29,6 +32,18 @@ class _AITutorPageState extends State<AITutorPage> {
       text: 'Hello! How can I help you study today? Ask me anything about your notes.',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // If an initial query was passed, run it automatically after build
+    if (widget.initialQuery != null && widget.initialQuery!.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _controller.text = widget.initialQuery!;
+        _runAsk();
+      });
+    }
+  }
 
   @override
   void dispose() {

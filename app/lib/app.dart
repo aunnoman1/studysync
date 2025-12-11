@@ -61,6 +61,7 @@ class _AppShellState extends State<_AppShell> {
   NoteRecord? _viewingNote;
   final List<NoteImage> _viewingImages = [];
   int _currentImageIndex = 0;
+  String? _initialAiQuery; // Store initial query for AI Tutor
   final Set<int> _ocrInProgress = <int>{};
   final Set<int> _ocrFailed = <int>{};
   final Set<int> _embInProgress = <int>{};
@@ -386,6 +387,12 @@ class _AppShellState extends State<_AppShell> {
             });
             _openCaptured(note);
           },
+          onAskTutor: (query) {
+            setState(() {
+              activeTab = ActiveTab.aiTutor;
+              _initialAiQuery = query;
+            });
+          },
         );
       case ActiveTab.myNotes:
         return MyNotesPage(
@@ -406,9 +413,25 @@ class _AppShellState extends State<_AppShell> {
           },
         );
       case ActiveTab.aiTutor:
+        final query = _initialAiQuery;
+        // Reset query after passing it once to avoid re-triggering on rebuilds
+        if (_initialAiQuery != null) {
+          // We clear it in the next frame or let the page handle it.
+          // Better: pass it and let the page consume it. 
+          // But since build() is pure, we should clear it in a state update callback from the page 
+          // or just pass it as a one-off "initial" param which the page state reads only on init.
+          // However, since AITutorPage stays in the tree (ActiveTab switches), 
+          // we might need to force a re-init if the widget is rebuilt with a new query.
+          // A simple way is to pass a unique key when we have a query, or handle didUpdateWidget.
+          // For now, let's pass it. We'll clear the state variable here to ensure it's not reused.
+          // This side-effect in build is not ideal but works for simple nav.
+          // Better: wrap in a microtask to clear.
+          Future.microtask(() => _initialAiQuery = null);
+        }
         return AITutorPage(
           db: widget.db,
           askService: _askService,
+          initialQuery: query,
         );
       case ActiveTab.community:
         return const CommunityPage();

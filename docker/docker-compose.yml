@@ -73,7 +73,7 @@ services:
       - EMBEDDING_SERVER_URL=http://embedding-service:8001
       # Connect to Ollama
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=ministral-3:8b
+      # OLLAMA_MODEL is loaded from ../server/.env via env_file
     env_file:
       - ../server/.env
     depends_on:

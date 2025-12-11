@@ -1,0 +1,33 @@
+# Use newer PyTorch image to be compatible with latest transformers
+FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements (we will create a specific one or use the main one)
+# For now, we'll install specific packages needed for OCR
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    python-multipart \
+    pillow \
+    transformers \
+    torch \
+    python-dotenv
+
+# Copy model files
+COPY server/models/ocr /app/models/ocr
+
+# Copy source code
+COPY server/main.py /app/main.py
+
+# Expose port
+EXPOSE 8000
+
+# Run the application
+CMD ["python", "main.py"]
+

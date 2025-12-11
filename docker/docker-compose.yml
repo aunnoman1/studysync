@@ -1,0 +1,85 @@
+services:
+  # 1. OCR Service (GPU Enabled)
+  ocr-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ocr
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+    env_file:
+      - ../server/.env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ../server/models/ocr:/app/models/ocr  # Mount models to avoid rebuilding just for model changes
+
+  # 2. Embedding Service (GPU Enabled)
+  embedding-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.embedding
+    ports:
+      - "8001:8001"
+    environment:
+      - HOST=0.0.0.0
+      - EMB_PORT=8001
+      - EMB_MODEL_PATH=models/embedding
+    env_file:
+      - ../server/.env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ../server/models/embedding:/app/models/embedding
+
+  # 3. Ollama (GPU Enabled)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ollama_data:/root/.ollama
+
+  # 4. Ask Service (CPU - Orchestrator)
+  ask-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ask
+    ports:
+      - "8002:8002"
+    environment:
+      - HOST=0.0.0.0
+      - ASK_PORT=8002
+      # Connect to other services by service name
+      - EMBEDDING_SERVER_URL=http://embedding-service:8001
+      # Connect to Ollama
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=ministral-3:8b
+    env_file:
+      - ../server/.env
+    depends_on:
+      - embedding-service
+      - ollama
+
+volumes:
+  ollama_data:
+

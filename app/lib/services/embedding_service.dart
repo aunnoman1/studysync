@@ -44,4 +44,21 @@ class EmbeddingService {
         .toList(growable: false);
     return items;
   }
+
+  Future<Float32List> embed(String text) async {
+    final uri = Uri.parse('$baseUrl/embedding/embed');
+    final res = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'text': text}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Embedding failed: ${res.statusCode} ${res.body}');
+    }
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    final vecList = (data['vector'] as List<dynamic>? ?? [])
+        .map((e) => (e as num).toDouble())
+        .toList(growable: false);
+    return Float32List.fromList(vecList);
+  }
 }

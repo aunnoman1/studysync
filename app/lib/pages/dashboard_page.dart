@@ -5,10 +5,13 @@ import '../models/note_record.dart';
 class DashboardPage extends StatelessWidget {
   final List<NoteRecord> recentNotes;
   final void Function(NoteRecord note) onOpenNote;
+  final void Function(String query) onAskTutor;
+
   const DashboardPage({
     super.key,
     required this.recentNotes,
     required this.onOpenNote,
+    required this.onAskTutor,
   });
 
   @override
@@ -41,7 +44,7 @@ class DashboardPage extends StatelessWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _CardRecentNotes(notes: recentNotes, onOpenNote: onOpenNote),
-                  const _CardTutorQuickAccess(),
+                  _CardTutorQuickAccess(onAsk: onAskTutor),
                   const _CardCommunityActivity(),
                 ],
               );
@@ -145,7 +148,8 @@ class _RecentNoteItem extends StatelessWidget {
 }
 
 class _CardTutorQuickAccess extends StatelessWidget {
-  const _CardTutorQuickAccess();
+  final void Function(String query) onAsk;
+  const _CardTutorQuickAccess({required this.onAsk});
 
   @override
   Widget build(BuildContext context) {
@@ -175,10 +179,15 @@ class _CardTutorQuickAccess extends StatelessWidget {
             style: TextStyle(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 12),
-          const TextField(
-            decoration: InputDecoration(
+          TextField(
+            decoration: const InputDecoration(
               hintText: 'E.g., Explain polymorphism in OOP',
             ),
+            onSubmitted: (value) {
+              if (value.trim().isNotEmpty) {
+                onAsk(value.trim());
+              }
+            },
           ),
         ],
       ),

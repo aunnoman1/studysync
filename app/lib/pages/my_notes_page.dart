@@ -10,7 +10,7 @@ String _formatDate(DateTime dt) {
   return '$y-$m-$day';
 }
 
-class MyNotesPage extends StatelessWidget {
+class MyNotesPage extends StatefulWidget {
   final void Function() onCreateNew;
   final List<NoteRecord> capturedNotes;
   final void Function(NoteRecord note) onOpenCaptured;
@@ -25,7 +25,20 @@ class MyNotesPage extends StatelessWidget {
   });
 
   @override
+  State<MyNotesPage> createState() => _MyNotesPageState();
+}
+
+class _MyNotesPageState extends State<MyNotesPage> {
+  String _searchQuery = '';
+
+  @override
   Widget build(BuildContext context) {
+    // Filter notes based on search query
+    final filteredNotes = widget.capturedNotes.where((note) {
+      if (_searchQuery.isEmpty) return true;
+      return note.title.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -47,13 +60,37 @@ class MyNotesPage extends StatelessWidget {
                   children: [
                     const Text('All Notes', style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w600)),
                     ElevatedButton(
-                      onPressed: onCreateNew,
+                      onPressed: widget.onCreateNew,
                       child: const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         child: Text('Add New'),
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                // Search Bar
+                TextField(
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val.trim();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Filter by title...',
+                    prefixIcon: const Icon(Icons.search, color: AppTheme.textSecondary),
+                    filled: true,
+                    fillColor: AppTheme.lightInputFill,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppTheme.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppTheme.border),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -77,30 +114,39 @@ class MyNotesPage extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // Render captured photo notes first
-                      ...capturedNotes.map(
-                        (photo) => InkWell(
-                          onTap: () => onOpenCaptured(photo),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            decoration: const BoxDecoration(
-                              border: Border(bottom: BorderSide(color: AppTheme.border)),
-                            ),
-                            child: Row(
-                              children: [
-                                _Cell(photo.title, flex: 2),
-                                _Cell(photo.course),
-                                _Cell(_formatDate(photo.createdAt)),
-                                IconButton(
-                                  tooltip: 'Delete',
-                                  onPressed: () => onDeleteCaptured(photo),
-                                  icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
-                                ),
-                              ],
+                      if (filteredNotes.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Text(
+                            'No notes found matching "$_searchQuery"',
+                            style: const TextStyle(color: AppTheme.textSecondary),
+                          ),
+                        )
+                      else
+                        // Render filtered notes
+                        ...filteredNotes.map(
+                          (photo) => InkWell(
+                            onTap: () => widget.onOpenCaptured(photo),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              decoration: const BoxDecoration(
+                                border: Border(bottom: BorderSide(color: AppTheme.border)),
+                              ),
+                              child: Row(
+                                children: [
+                                  _Cell(photo.title, flex: 2),
+                                  _Cell(photo.course),
+                                  _Cell(_formatDate(photo.createdAt)),
+                                  IconButton(
+                                    tooltip: 'Delete',
+                                    onPressed: () => widget.onDeleteCaptured(photo),
+                                    icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),

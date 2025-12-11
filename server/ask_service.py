@@ -56,7 +56,8 @@ def _get_llm() -> OllamaLLM:
     global _llm
     if _llm is None:
         model_name = os.getenv("OLLAMA_MODEL", "phi")
-        _llm = OllamaLLM(model=model_name)
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        _llm = OllamaLLM(model=model_name, base_url=base_url)
     return _llm
 
 

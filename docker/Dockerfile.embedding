@@ -1,0 +1,27 @@
+# Use newer PyTorch image to be compatible with latest transformers
+FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    sentence-transformers \
+    langchain-text-splitters \
+    python-dotenv \
+    httpx
+
+# Copy model files
+COPY server/models/embedding /app/models/embedding
+
+# Copy source code
+COPY server/embedding_service.py /app/embedding_service.py
+COPY server/ask_service.py /app/ask_service.py
+
+# Expose port
+EXPOSE 8001
+
+# Run the application
+CMD ["python", "embedding_service.py"]
+

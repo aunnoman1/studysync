@@ -1,0 +1,23 @@
+# Lightweight python image since this is mostly IO bound (calling other services/Ollama)
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    httpx \
+    pydantic \
+    langchain-ollama \
+    python-dotenv
+
+# Copy source code
+COPY server/ask_service.py /app/ask_service.py
+
+# Expose port
+EXPOSE 8002
+
+# Run the application
+CMD ["python", "ask_service.py"]
+

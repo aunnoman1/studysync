@@ -17,6 +17,7 @@ import 'widgets/note_delete_flow.dart';
 import 'objectbox.dart';
 import 'services/ocr_service.dart';
 import 'services/embedding_service.dart';
+import 'services/local_embedding/local_minilm_embedder.dart';
 import 'services/ask_service.dart';
 import 'services/search_service.dart';
 import 'services/note_transfer_service.dart';
@@ -72,6 +73,7 @@ class _AppShellState extends State<_AppShell> {
   final Set<int> _embInProgress = <int>{};
   final Set<int> _embFailed = <int>{};
   late final AskService _askService;
+  late final EmbeddingService _embeddingService;
   late final SearchService _searchService;
   late final NoteTransferService _noteTransferService;
   late final DriveAuthService _driveAuthService;
@@ -83,9 +85,10 @@ class _AppShellState extends State<_AppShell> {
   void initState() {
     super.initState();
     _askService = AskService(baseUrl: Env.askUrl);
+    _embeddingService = EmbeddingService(baseUrl: Env.embeddingUrl);
     _searchService = SearchService(
       db: widget.db,
-      embeddingService: EmbeddingService(baseUrl: Env.embeddingUrl),
+      embeddingService: _embeddingService,
     );
     _noteTransferService = NoteTransferService(db: widget.db);
     _driveAuthService = DriveAuthService();
@@ -116,6 +119,7 @@ class _AppShellState extends State<_AppShell> {
       }
     });
     Future.microtask(_refreshDriveSyncStatus);
+    Future.microtask(LocalMinilmEmbedder.tryLoad);
   }
 
   Future<void> _runOcrForImage(NoteImage image) async {
@@ -791,7 +795,7 @@ class _AppShellState extends State<_AppShell> {
         _embFailed.add(note.id);
         return;
       }
-      final svc = EmbeddingService(baseUrl: Env.embeddingUrl);
+      final svc = _embeddingService;
       final pairs = await svc.chunkAndEmbed(fullText);
       // Clear old embeddings and save new
       _clearEmbeddingsForNote(note);

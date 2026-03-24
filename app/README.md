@@ -2,6 +2,17 @@
 
 A new Flutter project.
 
+## Offline smart search (ONNX MiniLM)
+
+Smart search can run **without** the embedding server if `assets/onnx/minilm/model.onnx` is present. Generate it once:
+
+```bash
+cd ../server && source env/bin/activate && pip install onnx onnxscript torch transformers
+python scripts/export_minilm_onnx.py
+```
+
+See `assets/onnx/README.md`. The file is large (~90MB) and is gitignored by default.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

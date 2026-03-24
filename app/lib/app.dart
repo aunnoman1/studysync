@@ -10,13 +10,18 @@ import 'pages/ai_tutor_page.dart';
 import 'pages/community_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/search_page.dart';
+import 'pages/drive_sync_settings_page.dart';
 import 'theme.dart';
 import 'widgets/sidebar.dart';
+import 'widgets/note_delete_flow.dart';
 import 'objectbox.dart';
 import 'services/ocr_service.dart';
 import 'services/embedding_service.dart';
 import 'services/ask_service.dart';
 import 'services/search_service.dart';
+import 'services/note_transfer_service.dart';
+import 'services/drive_auth_service.dart';
+import 'services/drive_sync_service.dart';
 import 'dart:typed_data';
 import 'objectbox.g.dart';
 import 'env.dart';
@@ -68,6 +73,11 @@ class _AppShellState extends State<_AppShell> {
   final Set<int> _embFailed = <int>{};
   late final AskService _askService;
   late final SearchService _searchService;
+  late final NoteTransferService _noteTransferService;
+  late final DriveAuthService _driveAuthService;
+  late final DriveSyncService _driveSyncService;
+  List<NoteSyncStatusRow> _noteSyncRows = const [];
+  bool _driveConnected = false;
 
   @override
   void initState() {
@@ -76,6 +86,13 @@ class _AppShellState extends State<_AppShell> {
     _searchService = SearchService(
       db: widget.db,
       embeddingService: EmbeddingService(baseUrl: Env.embeddingUrl),
+    );
+    _noteTransferService = NoteTransferService(db: widget.db);
+    _driveAuthService = DriveAuthService();
+    _driveSyncService = DriveSyncService(
+      db: widget.db,
+      authService: _driveAuthService,
+      transferService: _noteTransferService,
     );
     // Load persisted notes
     final loaded = widget.db.noteBox.getAll();
@@ -98,6 +115,7 @@ class _AppShellState extends State<_AppShell> {
         });
       }
     });
+    Future.microtask(_refreshDriveSyncStatus);
   }
 
   Future<void> _runOcrForImage(NoteImage image) async {
@@ -277,13 +295,215 @@ class _AppShellState extends State<_AppShell> {
   }
 
   void _deleteCaptured(NoteRecord note) {
-    widget.db.noteBox.remove(note.id);
+    _noteTransferService.deleteNoteTree(note.id);
     setState(() {
       _notes.removeWhere((n) => n.id == note.id);
       if (_viewingNote?.id == note.id) {
         _viewingNote = null;
       }
     });
+    Future.microtask(() => _refreshDriveSyncStatus());
+  }
+
+  Future<void> _importNotes() async {
+    try {
+      final result = await _noteTransferService.importFromPickedFile();
+      if (result == null) return;
+      final loaded = widget.db.noteBox.getAll();
+      loaded.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      setState(() {
+        _notes
+          ..clear()
+          ..addAll(loaded);
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Imported ${result.importedCount} note(s), failed ${result.failedCount}.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Import failed: $e')));
+    }
+  }
+
+  Future<void> _exportSelectedNotes(List<NoteRecord> selectedNotes) async {
+    if (selectedNotes.isEmpty) return;
+    try {
+      final result = await _noteTransferService.exportSelectedNotesToFile(
+        selectedNotes.map((n) => n.id).toList(),
+      );
+      if (!mounted) return;
+      String message;
+      if (result.exportedCount == 0) {
+        message = 'Export cancelled. No notes were saved.';
+      } else if (result.skippedCount > 0) {
+        message =
+            'Exported ${result.exportedCount} note(s). Skipped ${result.skippedCount}.';
+      } else {
+        message = 'Exported ${result.exportedCount} note(s).';
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
+  void _reloadNotesFromDb() {
+    final loaded = widget.db.noteBox.getAll();
+    loaded.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    setState(() {
+      _notes
+        ..clear()
+        ..addAll(loaded);
+      if (_viewingNote != null) {
+        final id = _viewingNote!.id;
+        final match = loaded.where((n) => n.id == id).toList();
+        _viewingNote = match.isNotEmpty ? match.first : null;
+      }
+    });
+  }
+
+  /// Sync row for the open note (falls back to local-only if not in index yet).
+  NoteSyncStatusRow _syncRowForNote(NoteRecord note) {
+    for (final r in _noteSyncRows) {
+      if (r.localNote?.id == note.id) return r;
+    }
+    return NoteSyncStatusRow(
+      key: note.title.toLowerCase(),
+      displayTitle: note.title,
+      state: NoteCloudState.localOnly,
+      localNote: note,
+      driveFile: null,
+      latestTimestamp: note.updatedAt,
+      conflictResolved: false,
+    );
+  }
+
+  Future<void> _handleNoteDeleteFromViewer(NoteRecord note) async {
+    await NoteDeleteFlow.showForRow(
+      context,
+      row: _syncRowForNote(note),
+      driveConnected: _driveConnected,
+      onDeleteLocalFull: _deleteCaptured,
+      onDeleteDriveFile: _deleteDriveFile,
+      onDeleteLocalCopy: _deleteLocalCopy,
+      onDeleteSyncedBoth: _deleteSyncedBoth,
+    );
+  }
+
+  Future<void> _refreshDriveSyncStatus() async {
+    final auth = await _driveAuthService.getState();
+    if (!mounted) return;
+    _driveConnected = auth.isConnected;
+    if (!_driveConnected) {
+      setState(() {
+        _noteSyncRows = _notes
+            .map(
+              (n) => NoteSyncStatusRow(
+                key: n.title.toLowerCase(),
+                displayTitle: n.title,
+                state: NoteCloudState.localOnly,
+                localNote: n,
+                driveFile: null,
+                latestTimestamp: n.updatedAt,
+                conflictResolved: false,
+              ),
+            )
+            .toList();
+      });
+      return;
+    }
+
+    try {
+      final result = await _driveSyncService.refreshIndex();
+      _reloadNotesFromDb();
+      if (!mounted) return;
+      setState(() {
+        _noteSyncRows = result.rows;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _noteSyncRows = _notes
+            .map(
+              (n) => NoteSyncStatusRow(
+                key: n.title.toLowerCase(),
+                displayTitle: n.title,
+                state: NoteCloudState.localOnly,
+                localNote: n,
+                driveFile: null,
+                latestTimestamp: n.updatedAt,
+                conflictResolved: false,
+              ),
+            )
+            .toList();
+      });
+    }
+  }
+
+  Future<void> _uploadAllLocalOnly() async {
+    final summary = await _driveSyncService.uploadAllLocalOnly();
+    await _refreshDriveSyncStatus();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Uploaded ${summary.uploaded} local note(s). Failed: ${summary.failed}.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadAllDriveOnly() async {
+    final summary = await _driveSyncService.downloadAllDriveOnly();
+    await _refreshDriveSyncStatus();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Downloaded ${summary.downloaded} Drive note(s). Failed: ${summary.failed}.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _uploadLocalNote(NoteRecord note) async {
+    await _driveSyncService.uploadLocalNote(note.id);
+    await _refreshDriveSyncStatus();
+  }
+
+  Future<void> _downloadDriveOnlyNote(String driveFileId) async {
+    await _driveSyncService.downloadDriveOnlyNote(driveFileId);
+    await _refreshDriveSyncStatus();
+  }
+
+  Future<void> _deleteLocalCopy(NoteRecord note) async {
+    await _driveSyncService.deleteLocalCopy(note.id);
+    _reloadNotesFromDb();
+    await _refreshDriveSyncStatus();
+  }
+
+  Future<void> _deleteDriveFile(String driveFileId) async {
+    await _driveSyncService.deleteDriveFile(driveFileId);
+    _reloadNotesFromDb();
+    await _refreshDriveSyncStatus();
+  }
+
+  Future<void> _deleteSyncedBoth(NoteRecord note, String driveFileId) async {
+    await _driveSyncService.deleteSyncedBoth(note.id, driveFileId);
+    _reloadNotesFromDb();
+    await _refreshDriveSyncStatus();
   }
 
   Widget _buildContent() {
@@ -341,9 +561,7 @@ class _AppShellState extends State<_AppShell> {
         onRename: _renameCaptured,
         onUpdateCourse: _updateCourse,
         onUpdateText: _updateNoteText,
-        onDelete: (note) {
-          _deleteCaptured(note);
-        },
+        onDelete: () => _handleNoteDeleteFromViewer(note),
         isOcrProcessing: hasProcessing,
         isOcrFailed: hasFailed,
         ocrBlockCount: totalBlocks,
@@ -400,6 +618,18 @@ class _AppShellState extends State<_AppShell> {
           capturedNotes: _notes,
           onOpenCaptured: _openCaptured,
           onDeleteCaptured: _deleteCaptured,
+          onExportSelected: _exportSelectedNotes,
+          onImportNotes: _importNotes,
+          driveConnected: _driveConnected,
+          syncRows: _noteSyncRows,
+          onRefreshSync: _refreshDriveSyncStatus,
+          onUploadAllLocalOnly: _uploadAllLocalOnly,
+          onDownloadAllDriveOnly: _downloadAllDriveOnly,
+          onUploadLocalNote: _uploadLocalNote,
+          onDownloadDriveOnlyNote: _downloadDriveOnlyNote,
+          onDeleteLocalCopy: _deleteLocalCopy,
+          onDeleteDriveFile: _deleteDriveFile,
+          onDeleteSyncedBoth: _deleteSyncedBoth,
         );
       case ActiveTab.search:
         return SearchPage(
@@ -417,10 +647,10 @@ class _AppShellState extends State<_AppShell> {
         // Reset query after passing it once to avoid re-triggering on rebuilds
         if (_initialAiQuery != null) {
           // We clear it in the next frame or let the page handle it.
-          // Better: pass it and let the page consume it. 
-          // But since build() is pure, we should clear it in a state update callback from the page 
+          // Better: pass it and let the page consume it.
+          // But since build() is pure, we should clear it in a state update callback from the page
           // or just pass it as a one-off "initial" param which the page state reads only on init.
-          // However, since AITutorPage stays in the tree (ActiveTab switches), 
+          // However, since AITutorPage stays in the tree (ActiveTab switches),
           // we might need to force a re-init if the widget is rebuilt with a new query.
           // A simple way is to pass a unique key when we have a query, or handle didUpdateWidget.
           // For now, let's pass it. We'll clear the state variable here to ensure it's not reused.
@@ -460,6 +690,12 @@ class _AppShellState extends State<_AppShell> {
               ),
             );
           },
+        );
+      case ActiveTab.cloudSync:
+        return DriveSyncSettingsPage(
+          authService: _driveAuthService,
+          syncService: _driveSyncService,
+          onSyncCompleted: _refreshDriveSyncStatus,
         );
     }
   }

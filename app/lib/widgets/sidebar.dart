@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 
-enum ActiveTab { dashboard, myNotes, search, aiTutor, community, profile }
+enum ActiveTab {
+  dashboard,
+  myNotes,
+  search,
+  aiTutor,
+  community,
+  cloudSync,
+  profile,
+}
 
 class Sidebar extends StatelessWidget {
   final ActiveTab activeTab;
@@ -44,6 +52,11 @@ class Sidebar extends StatelessWidget {
         id: ActiveTab.community,
         label: 'Community',
         icon: Icons.forum_outlined,
+      ),
+      _NavItem(
+        id: ActiveTab.cloudSync,
+        label: 'Cloud Sync',
+        icon: Icons.cloud_sync_outlined,
       ),
       _NavItem(
         id: ActiveTab.profile,
@@ -90,7 +103,10 @@ class Sidebar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: selected ? AppTheme.blue : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
@@ -99,13 +115,17 @@ class Sidebar extends StatelessWidget {
                       children: [
                         Icon(
                           item.icon,
-                          color: selected ? Colors.white : AppTheme.textSecondary,
+                          color: selected
+                              ? Colors.white
+                              : AppTheme.textSecondary,
                         ),
                         const SizedBox(width: 12),
                         Text(
                           item.label,
                           style: TextStyle(
-                            color: selected ? Colors.white : AppTheme.textPrimary,
+                            color: selected
+                                ? Colors.white
+                                : AppTheme.textPrimary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -139,11 +159,7 @@ class Sidebar extends StatelessWidget {
     if (isInDrawer) {
       return Container(color: AppTheme.surface, child: content);
     }
-    return Container(
-      width: 260,
-      color: AppTheme.surface,
-      child: content,
-    );
+    return Container(width: 260, color: AppTheme.surface, child: content);
   }
 }
 
@@ -154,5 +170,3 @@ class _NavItem {
 
   _NavItem({required this.id, required this.label, required this.icon});
 }
-
-

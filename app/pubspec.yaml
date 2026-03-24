@@ -40,6 +40,12 @@ dependencies:
   cupertino_icons: ^1.0.8
   image_picker: ^1.1.2
   file_selector: ^1.0.3
+  google_sign_in: ^6.3.0
+  googleapis: ^14.0.0
+  googleapis_auth: ^2.0.0
+  extension_google_sign_in_as_googleapis_auth: ^2.0.13
+  shared_preferences: ^2.3.2
+  url_launcher: ^6.3.2
   objectbox: ^5.0.2
   objectbox_flutter_libs: ^5.0.2
   supabase_flutter: ^2.5.6

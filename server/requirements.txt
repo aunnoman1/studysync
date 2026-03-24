@@ -7,6 +7,8 @@ Pillow
 accelerate
 python-dotenv
 sentence-transformers
+onnx
+onnxscript
 langchain-text-splitters
 httpx
 langchain-ollama

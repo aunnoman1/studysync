@@ -123,6 +123,8 @@ sdist/
 client_secret*.json
 **/client_secret*.json
 
+# Large on-device MiniLM ONNX (~90MB). Kept in repo intentionally.
+
 
 # Miscellaneous
 *.class

@@ -10,7 +10,8 @@ class NotePhotoViewPage extends StatelessWidget {
   final void Function(NoteRecord note, String newTitle) onRename;
   final void Function(NoteRecord note, String newCourse) onUpdateCourse;
   final void Function(NoteRecord note, String? newText) onUpdateText;
-  final void Function(NoteRecord note) onDelete;
+  /// Same delete prompts as My Notes (local / cloud / synced).
+  final Future<void> Function() onDelete;
   final bool isOcrProcessing;
   final bool isOcrFailed;
   final int ocrBlockCount;
@@ -135,36 +136,10 @@ class NotePhotoViewPage extends StatelessWidget {
               IconButton(
                 tooltip: 'Delete',
                 onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      backgroundColor: AppTheme.surface,
-                      title: const Text(
-                        'Delete note?',
-                        style: TextStyle(color: AppTheme.textPrimary),
-                      ),
-                      content: const Text(
-                        'This action cannot be undone.',
-                        style: TextStyle(color: AppTheme.textSecondary),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    onDelete(note);
-                  }
+                  await onDelete();
                 },
                 icon: const Icon(
-                  Icons.delete_outline,
+                  Icons.delete_outline_rounded,
                   color: Color(0xFFEF4444),
                 ),
               ),

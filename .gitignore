@@ -116,6 +116,13 @@ sdist/
 .mr.developer.cfg
 .envrc
 
+# --------
+# Secrets & OAuth (never commit)
+# --------
+# Google OAuth desktop client JSON from Cloud Console (e.g. client_secret_<id>.apps.googleusercontent.com.json)
+client_secret*.json
+**/client_secret*.json
+
 
 # Miscellaneous
 *.class

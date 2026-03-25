@@ -8,12 +8,12 @@ RUN pip install --no-cache-dir \
     fastapi \
     uvicorn \
     sentence-transformers \
+    "transformers<5.0.0" \
     langchain-text-splitters \
     python-dotenv \
     httpx
 
-# Copy model files
-COPY server/models/embedding /app/models/embedding
+
 
 # Copy source code
 COPY server/embedding_service.py /app/embedding_service.py

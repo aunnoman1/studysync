@@ -50,8 +50,13 @@ class NoteImage {
 
   final note = ToOne<NoteRecord>();
 
+  /// Display image (original with diagram outlines drawn).
   @Property(type: PropertyType.byteVector)
   Uint8List imageBytes;
+
+  /// Blacked-out version of the image sent to OCR.
+  @Property(type: PropertyType.byteVector)
+  Uint8List? ocrImageBytes;
 
   @Property(type: PropertyType.date)
   DateTime createdAt;
@@ -60,9 +65,11 @@ class NoteImage {
   bool ocrProcessed;
 
   final ocrBlocks = ToMany<OcrBlock>();
+  final diagrams = ToMany<NoteDiagram>();
 
   NoteImage({
     required this.imageBytes,
+    this.ocrImageBytes,
     DateTime? createdAt,
     this.ocrProcessed = false,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -124,5 +131,34 @@ class TextChunk {
     required this.chunkText,
     required this.embedding,
     this.orderIndex = 0,
+  });
+}
+
+/// A selected diagram cropped from a NoteImage, stored alongside LLM explanation
+@Entity()
+class NoteDiagram {
+  @Id()
+  int id = 0;
+
+  final image = ToOne<NoteImage>();
+
+  @Property(type: PropertyType.byteVector)
+  Uint8List imageBytes;
+
+  /// Bounding box coordinates in local image space [x1,y1,x2,y2,x3,y3,x4,y4].
+  @Property(type: PropertyType.byteVector)
+  Uint8List quad;
+
+  String? explanation;
+
+  @HnswIndex(dimensions: 384)
+  @Property(type: PropertyType.floatVector)
+  Float32List? embedding;
+
+  NoteDiagram({
+    required this.imageBytes,
+    required this.quad,
+    this.explanation,
+    this.embedding,
   });
 }

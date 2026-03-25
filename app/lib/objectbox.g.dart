@@ -185,7 +185,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(5, 1983914704999987015),
     name: 'NoteImage',
-    lastPropertyId: const obx_int.IdUid(5, 3387588151804127568),
+    lastPropertyId: const obx_int.IdUid(6, 4249709358822627966),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -221,6 +221,12 @@ final _entities = <obx_int.ModelEntity>[
         type: 1,
         flags: 0,
       ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 4249709358822627966),
+        name: 'ocrImageBytes',
+        type: 23,
+        flags: 0,
+      ),
     ],
     relations: <obx_int.ModelRelation>[
       obx_int.ModelRelation(
@@ -228,7 +234,63 @@ final _entities = <obx_int.ModelEntity>[
         name: 'ocrBlocks',
         targetId: const obx_int.IdUid(3, 2554812963669290589),
       ),
+      obx_int.ModelRelation(
+        id: const obx_int.IdUid(5, 7301108566495245466),
+        name: 'diagrams',
+        targetId: const obx_int.IdUid(6, 6957136942209634261),
+      ),
     ],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(6, 6957136942209634261),
+    name: 'NoteDiagram',
+    lastPropertyId: const obx_int.IdUid(6, 151816467112864314),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 6614808711320328827),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 7769715410298335548),
+        name: 'imageId',
+        type: 11,
+        flags: 520,
+        indexId: const obx_int.IdUid(6, 7670878645598571814),
+        relationField: 'image',
+        relationTarget: 'NoteImage',
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 8816401310779922472),
+        name: 'imageBytes',
+        type: 23,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 8641951517769286787),
+        name: 'quad',
+        type: 23,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 8275197273873772119),
+        name: 'explanation',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 151816467112864314),
+        name: 'embedding',
+        type: 28,
+        flags: 8,
+        indexId: const obx_int.IdUid(7, 836298631036309174),
+        hnswParams: obx_int.ModelHnswParams(dimensions: 384),
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[],
   ),
 ];
@@ -276,9 +338,9 @@ obx_int.ModelDefinition getObjectBoxModel() {
     // Typically, this is done with `dart run build_runner build`.
     generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
-    lastEntityId: const obx_int.IdUid(5, 1983914704999987015),
-    lastIndexId: const obx_int.IdUid(5, 6217677094220620847),
-    lastRelationId: const obx_int.IdUid(4, 3488293991052873370),
+    lastEntityId: const obx_int.IdUid(6, 6957136942209634261),
+    lastIndexId: const obx_int.IdUid(7, 836298631036309174),
+    lastRelationId: const obx_int.IdUid(5, 7301108566495245466),
     lastSequenceId: const obx_int.IdUid(0, 0),
     retiredEntityUids: const [1407255643202042497],
     retiredIndexUids: const [2181264681781770524],
@@ -498,6 +560,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
       toOneRelations: (NoteImage object) => [object.note],
       toManyRelations: (NoteImage object) => {
         obx_int.RelInfo<NoteImage>.toMany(3, object.id): object.ocrBlocks,
+        obx_int.RelInfo<NoteImage>.toMany(5, object.id): object.diagrams,
       },
       getId: (NoteImage object) => object.id,
       setId: (NoteImage object, int id) {
@@ -505,12 +568,16 @@ obx_int.ModelDefinition getObjectBoxModel() {
       },
       objectToFB: (NoteImage object, fb.Builder fbb) {
         final imageBytesOffset = fbb.writeListInt8(object.imageBytes);
-        fbb.startTable(6);
+        final ocrImageBytesOffset = object.ocrImageBytes == null
+            ? null
+            : fbb.writeListInt8(object.ocrImageBytes!);
+        fbb.startTable(7);
         fbb.addInt64(0, object.id);
         fbb.addInt64(1, object.note.targetId);
         fbb.addOffset(2, imageBytesOffset);
         fbb.addInt64(3, object.createdAt.millisecondsSinceEpoch);
         fbb.addBool(4, object.ocrProcessed);
+        fbb.addOffset(5, ocrImageBytesOffset);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -522,6 +589,11 @@ obx_int.ModelDefinition getObjectBoxModel() {
                   lazy: false,
                 ).vTableGet(buffer, rootOffset, 8, Uint8List(0))
                 as Uint8List;
+        final ocrImageBytesParam =
+            const fb.Uint8ListReader(
+                  lazy: false,
+                ).vTableGetNullable(buffer, rootOffset, 14)
+                as Uint8List?;
         final createdAtParam = DateTime.fromMillisecondsSinceEpoch(
           const fb.Int64Reader().vTableGet(buffer, rootOffset, 10, 0),
         );
@@ -533,6 +605,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         );
         final object = NoteImage(
           imageBytes: imageBytesParam,
+          ocrImageBytes: ocrImageBytesParam,
           createdAt: createdAtParam,
           ocrProcessed: ocrProcessedParam,
         )..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
@@ -548,6 +621,72 @@ obx_int.ModelDefinition getObjectBoxModel() {
           store,
           obx_int.RelInfo<NoteImage>.toMany(3, object.id),
         );
+        obx_int.InternalToManyAccess.setRelInfo<NoteImage>(
+          object.diagrams,
+          store,
+          obx_int.RelInfo<NoteImage>.toMany(5, object.id),
+        );
+        return object;
+      },
+    ),
+    NoteDiagram: obx_int.EntityDefinition<NoteDiagram>(
+      model: _entities[4],
+      toOneRelations: (NoteDiagram object) => [object.image],
+      toManyRelations: (NoteDiagram object) => {},
+      getId: (NoteDiagram object) => object.id,
+      setId: (NoteDiagram object, int id) {
+        object.id = id;
+      },
+      objectToFB: (NoteDiagram object, fb.Builder fbb) {
+        final imageBytesOffset = fbb.writeListInt8(object.imageBytes);
+        final quadOffset = fbb.writeListInt8(object.quad);
+        final explanationOffset = object.explanation == null
+            ? null
+            : fbb.writeString(object.explanation!);
+        final embeddingOffset = object.embedding == null
+            ? null
+            : fbb.writeListFloat32(object.embedding!);
+        fbb.startTable(7);
+        fbb.addInt64(0, object.id);
+        fbb.addInt64(1, object.image.targetId);
+        fbb.addOffset(2, imageBytesOffset);
+        fbb.addOffset(3, quadOffset);
+        fbb.addOffset(4, explanationOffset);
+        fbb.addOffset(5, embeddingOffset);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final imageBytesParam =
+            const fb.Uint8ListReader(
+                  lazy: false,
+                ).vTableGet(buffer, rootOffset, 8, Uint8List(0))
+                as Uint8List;
+        final quadParam =
+            const fb.Uint8ListReader(
+                  lazy: false,
+                ).vTableGet(buffer, rootOffset, 10, Uint8List(0))
+                as Uint8List;
+        final explanationParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGetNullable(buffer, rootOffset, 12);
+        final embeddingParam = const obx_int.Float32ListReader()
+            .vTableGetNullable(buffer, rootOffset, 14);
+        final object = NoteDiagram(
+          imageBytes: imageBytesParam,
+          quad: quadParam,
+          explanation: explanationParam,
+          embedding: embeddingParam,
+        )..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
+        object.image.targetId = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          6,
+          0,
+        );
+        object.image.attach(store);
         return object;
       },
     ),
@@ -697,8 +836,51 @@ class NoteImage_ {
     _entities[3].properties[4],
   );
 
+  /// See [NoteImage.ocrImageBytes].
+  static final ocrImageBytes = obx.QueryByteVectorProperty<NoteImage>(
+    _entities[3].properties[5],
+  );
+
   /// see [NoteImage.ocrBlocks]
   static final ocrBlocks = obx.QueryRelationToMany<NoteImage, OcrBlock>(
     _entities[3].relations[0],
+  );
+
+  /// see [NoteImage.diagrams]
+  static final diagrams = obx.QueryRelationToMany<NoteImage, NoteDiagram>(
+    _entities[3].relations[1],
+  );
+}
+
+/// [NoteDiagram] entity fields to define ObjectBox queries.
+class NoteDiagram_ {
+  /// See [NoteDiagram.id].
+  static final id = obx.QueryIntegerProperty<NoteDiagram>(
+    _entities[4].properties[0],
+  );
+
+  /// See [NoteDiagram.image].
+  static final image = obx.QueryRelationToOne<NoteDiagram, NoteImage>(
+    _entities[4].properties[1],
+  );
+
+  /// See [NoteDiagram.imageBytes].
+  static final imageBytes = obx.QueryByteVectorProperty<NoteDiagram>(
+    _entities[4].properties[2],
+  );
+
+  /// See [NoteDiagram.quad].
+  static final quad = obx.QueryByteVectorProperty<NoteDiagram>(
+    _entities[4].properties[3],
+  );
+
+  /// See [NoteDiagram.explanation].
+  static final explanation = obx.QueryStringProperty<NoteDiagram>(
+    _entities[4].properties[4],
+  );
+
+  /// See [NoteDiagram.embedding].
+  static final embedding = obx.QueryHnswProperty<NoteDiagram>(
+    _entities[4].properties[5],
   );
 }

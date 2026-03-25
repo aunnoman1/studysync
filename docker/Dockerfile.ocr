@@ -15,12 +15,11 @@ RUN pip install --no-cache-dir \
     uvicorn \
     python-multipart \
     pillow \
-    transformers \
+    "transformers<5.0.0" \
     torch \
     python-dotenv
 
-# Copy model files
-COPY server/models/ocr /app/models/ocr
+
 
 # Copy source code
 COPY server/main.py /app/main.py

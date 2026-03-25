@@ -48,6 +48,22 @@ class AskResponse(BaseModel):
     message: str  # LLM-generated response to the question
 
 
+class ExplainDiagramRequest(BaseModel):
+    image_base64: str = Field(..., description="Base64 encoded diagram image")
+    context: Optional[str] = Field(
+        None,
+        description="OCR text from the page the diagram appears on, for context",
+    )
+    prompt: Optional[str] = Field(
+        None,
+        description="Custom instruction prompt (auto-generated if not provided)",
+    )
+
+
+class ExplainDiagramResponse(BaseModel):
+    explanation: str
+
+
 # Initialize Ollama LLM (lazy loading)
 _llm: Optional[OllamaLLM] = None
 
@@ -287,6 +303,51 @@ The following text is your internal knowledge. You must teach these concepts as 
         response = AskResponse(message=llm_response)
         print(f"[DEBUG] Returning response with message length: {len(response.message)}")
         return response
+
+    @app.post("/explain-diagram", response_model=ExplainDiagramResponse)
+    async def explain_diagram(req: ExplainDiagramRequest) -> ExplainDiagramResponse:
+        """Send a diagram image to the same Ollama model used by the AI tutor."""
+        model_name = os.getenv("OLLAMA_MODEL", "phi")
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        print(f"[DIAGRAM] Explaining diagram with model={model_name}")
+
+        # Build prompt with optional OCR context
+        if req.prompt:
+            full_prompt = req.prompt
+        else:
+            full_prompt = ""
+            if req.context:
+                full_prompt += (
+                    f"Here is the text from the page this diagram appears on:\n"
+                    f"{req.context}\n\n"
+                )
+            full_prompt += (
+                "Analyze and explain this diagram in detail. "
+                "Describe what it represents, the relationships between "
+                "components, and any key concepts illustrated."
+            )
+        print(f"[DIAGRAM] Prompt length: {len(full_prompt)} chars")
+
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                payload = {
+                    "model": model_name,
+                    "prompt": full_prompt,
+                    "images": [req.image_base64],
+                    "stream": False,
+                }
+                resp = await client.post(f"{base_url}/api/generate", json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            explanation = data.get("response", "")
+            print(f"[DIAGRAM] Got explanation ({len(explanation)} chars)")
+            return ExplainDiagramResponse(explanation=explanation)
+        except Exception as e:
+            print(f"[ERROR] Diagram explanation failed: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Diagram explanation failed. Is Ollama running with '{model_name}'? Error: {e}",
+            )
 
 
 if __name__ == "__main__":

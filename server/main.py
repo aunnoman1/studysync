@@ -17,9 +17,9 @@ from transformers import AutoProcessor, AutoModelForVision2Seq
 # --- Global Variables for Model ---
 processor = None
 model = None
-device = "cuda" if torch.cuda.is_available() else "cpu"
-# Use bfloat16 for performance if available, otherwise float32
-model_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
+# Force CPU so GPU is free for LLM (Qwen2.5-VL via Ollama)
+device = "cpu"
+model_dtype = torch.float32
 last_image_bytes = None
 
 @asynccontextmanager

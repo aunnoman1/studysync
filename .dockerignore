@@ -1,0 +1,14 @@
+.venv/
+.git/
+app/
+server/models/
+misc/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+report.md
+*.jpeg
+*.jpg
+*.png
+.DS_Store

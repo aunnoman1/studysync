@@ -16,7 +16,9 @@ def run_command(command, cwd=None, shell=True):
             shell=shell, 
             stdout=subprocess.PIPE, 
             stderr=subprocess.STDOUT,
-            text=True
+            text=True,
+            encoding="utf-8",
+            errors="replace"
         )
         
         # Print output in real-time
@@ -83,7 +85,7 @@ def main():
     # 3. Pull Ollama Model
     print("\n=== 3. Setting up Ollama Model ===")
     if check_ollama_ready():
-        target_model = "ministral-3:8b" # Adjust this if needed
+        target_model = "qwen2.5vl:7b-q4_K_M" # Adjust this if needed
         
         print(f"Triggering pull for {target_model} inside Ollama container...")
         run_command(f"docker-compose exec ollama ollama pull {target_model}", cwd=docker_dir)

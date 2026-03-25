@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 python-multipart
 torch
-transformers
+transformers<5.0.0
 Pillow
 accelerate
 python-dotenv

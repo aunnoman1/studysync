@@ -128,7 +128,9 @@ class _AppShellState extends State<_AppShell> {
       _ocrInProgress.add(image.id);
       setState(() {});
       final ocr = OcrService(baseUrl: Env.serverUrl);
-      final blocks = await ocr.detect(image.imageBytes);
+      // Send the blacked-out image to OCR (falls back to display image if no OCR version)
+      final ocrBytes = image.ocrImageBytes ?? image.imageBytes;
+      final blocks = await ocr.detect(ocrBytes);
       for (final b in blocks) {
         final quadI32 = Int32List.fromList(b.quad);
         final quadBytes = quadI32.buffer.asUint8List();
@@ -151,12 +153,43 @@ class _AppShellState extends State<_AppShell> {
           await _runEmbeddingsForNote(parent);
         }
       }
+      // Now run diagram explanations with OCR context
+      if (image.diagrams.isNotEmpty) {
+        final ocrText = blocks.map((b) => b.text).join(' ');
+        _runDiagramExplanations(image, ocrText);
+      }
     } catch (e) {
       print('OCR failed: $e');
       _ocrFailed.add(image.id);
     } finally {
       _ocrInProgress.remove(image.id);
       setState(() {});
+    }
+  }
+
+  Future<void> _runDiagramExplanations(NoteImage image, String ocrContext) async {
+    for (final diagram in image.diagrams) {
+      if (diagram.explanation == null) {
+        try {
+          // 1. Get Explanation from VLM with OCR context
+          final explanation = await _askService.explainDiagram(
+            diagram.imageBytes,
+            context: ocrContext,
+          );
+          diagram.explanation = explanation;
+          
+          // 2. Embed the text structurally 
+          final embedding = await _embeddingService.embed(explanation);
+          diagram.embedding = embedding;
+          
+          // 3. Save to database
+          widget.db.noteDiagramBox.put(diagram);
+          
+          if (mounted) setState(() {});
+        } catch (e) {
+          print('Diagram extraction/embedding failed: $e');
+        }
+      }
     }
   }
 
@@ -513,7 +546,7 @@ class _AppShellState extends State<_AppShell> {
   Widget _buildContent() {
     if (activeTab == ActiveTab.myNotes && isCapturingNote) {
       return NoteCapturePage(
-        onSave: (images, title, course, text) {
+        onSave: (processedImages, title, course, text) {
           final note = NoteRecord(
             title: title,
             course: course,
@@ -521,9 +554,24 @@ class _AppShellState extends State<_AppShell> {
           );
           widget.db.noteBox.put(note);
           final createdImages = <NoteImage>[];
-          for (final Uint8List imgBytes in images) {
-            final img = NoteImage(imageBytes: imgBytes);
+
+          for (final result in processedImages) {
+            final img = NoteImage(
+              imageBytes: result.displayImageBytes,
+              ocrImageBytes: result.ocrImageBytes,
+            );
             img.note.target = note;
+            
+            // Add identified diagrams
+            for (final diagram in result.diagrams) {
+              final nd = NoteDiagram(
+                 imageBytes: diagram.imageBytes,
+                 quad: Uint8List.fromList(diagram.quad),
+              );
+              nd.image.target = img;
+              img.diagrams.add(nd);
+            }
+
             widget.db.noteImageBox.put(img);
             createdImages.add(img);
           }
@@ -531,7 +579,7 @@ class _AppShellState extends State<_AppShell> {
             _notes.insert(0, note);
             isCapturingNote = false;
           });
-          // Trigger OCR in background if we have an image
+          // Trigger OCR in background (diagram explanations now run after OCR completes)
           if (createdImages.isNotEmpty) {
             for (final img in createdImages) {
               _runOcrForImage(img);

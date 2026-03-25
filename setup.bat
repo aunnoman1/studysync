@@ -15,8 +15,7 @@ echo Upgrading pip...
 python -m pip install --upgrade pip
 
 echo Installing dependencies...
-:: Install standard requests for the script itself + model downloaders
-pip install requests sentence-transformers transformers torch
+pip install requests sentence-transformers "transformers<5.0.0" torch Pillow
 
 echo === 2. Running Setup Script ===
 python setup_and_run.py

@@ -84,6 +84,66 @@ class NoteDebugPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              // Diagrams section
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppTheme.lightInputFill,
+                  border: Border.all(color: AppTheme.border),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Diagrams Extracted',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Diagrams: ${images.isNotEmpty ? images[currentIndex].diagrams.length : 0}',
+                      style: const TextStyle(color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                    if (images.isNotEmpty && images[currentIndex].diagrams.isEmpty)
+                      const Text(
+                        'No diagrams.',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      )
+                    else if (images.isNotEmpty)
+                      ListView.separated(
+                        physics: const NeverScrollableScrollPhysics(),
+                        shrinkWrap: true,
+                        itemBuilder: (context, i) {
+                          final diag = images[currentIndex].diagrams[i];
+                          final expl = diag.explanation ?? 'Pending...';
+                          final embState = diag.embedding != null ? 'Yes' : 'No';
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                               Text(
+                                '#${i + 1} Embedded: $embState',
+                                style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                expl,
+                                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                              ),
+                            ]
+                          );
+                        },
+                        separatorBuilder: (_, __) => const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                        itemCount: images.isNotEmpty ? images[currentIndex].diagrams.length : 0,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               // Embeddings section
               Container(
                 width: double.infinity,

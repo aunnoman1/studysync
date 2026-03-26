@@ -94,6 +94,18 @@ class NoteTransferService {
             )..image.target = image;
             db.ocrBlockBox.put(block);
           }
+
+          for (final diagramDto in imageDto.diagrams) {
+            final diagram = NoteDiagram(
+              imageBytes: base64Decode(diagramDto.imageBytesBase64),
+              quad: base64Decode(diagramDto.quadBase64),
+              explanation: diagramDto.explanation,
+              embedding: diagramDto.embedding.isNotEmpty
+                  ? Float32List.fromList(diagramDto.embedding)
+                  : null,
+            )..image.target = image;
+            db.noteDiagramBox.put(diagram);
+          }
         }
 
         for (final chunkDto in dto.textChunks) {
@@ -144,6 +156,14 @@ class NoteTransferService {
       if (blocks.isNotEmpty) {
         db.ocrBlockBox.removeMany(blocks.map((b) => b.id).toList());
       }
+      final qDiagrams = db.noteDiagramBox
+          .query(NoteDiagram_.image.equals(image.id))
+          .build();
+      final diagrams = qDiagrams.find();
+      qDiagrams.close();
+      if (diagrams.isNotEmpty) {
+        db.noteDiagramBox.removeMany(diagrams.map((d) => d.id).toList());
+      }
     }
     if (images.isNotEmpty) {
       db.noteImageBox.removeMany(images.map((i) => i.id).toList());
@@ -179,6 +199,11 @@ class NoteTransferService {
       final blocks = qBlocks.find();
       qBlocks.close();
       blocks.sort((a, b) => a.readingOrder.compareTo(b.readingOrder));
+      final qDiagrams = db.noteDiagramBox
+          .query(NoteDiagram_.image.equals(image.id))
+          .build();
+      final diagrams = qDiagrams.find();
+      qDiagrams.close();
       imageDtos.add(
         NoteImageDto(
           imageBytesBase64: base64Encode(image.imageBytes),
@@ -191,6 +216,16 @@ class NoteTransferService {
                   page: b.page,
                   readingOrder: b.readingOrder,
                   quadBase64: base64Encode(b.quad),
+                ),
+              )
+              .toList(),
+          diagrams: diagrams
+              .map(
+                (d) => NoteDiagramDto(
+                  imageBytesBase64: base64Encode(d.imageBytes),
+                  quadBase64: base64Encode(d.quad),
+                  explanation: d.explanation,
+                  embedding: d.embedding?.map((e) => e.toDouble()).toList() ?? [],
                 ),
               )
               .toList(),

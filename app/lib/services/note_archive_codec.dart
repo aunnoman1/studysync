@@ -4,7 +4,9 @@ import 'dart:typed_data';
 import 'note_transfer_models.dart';
 
 class NoteArchiveCodec {
-  static const int schemaVersion = 1;
+  /// Schema version 1: initial format (no diagrams).
+  /// Schema version 2: added diagram data per image.
+  static const int schemaVersion = 2;
 
   Uint8List encode(NoteExportArchive archive) {
     final jsonMap = archive.toJson();
@@ -17,7 +19,8 @@ class NoteArchiveCodec {
       throw const FormatException('Invalid archive: expected JSON object.');
     }
     final archive = NoteExportArchive.fromJson(data);
-    if (archive.schemaVersion != schemaVersion) {
+    // Accept v1 (no diagrams) and v2 (with diagrams) for backwards compat.
+    if (archive.schemaVersion < 1 || archive.schemaVersion > schemaVersion) {
       throw FormatException(
         'Unsupported archive schema version: ${archive.schemaVersion}',
       );

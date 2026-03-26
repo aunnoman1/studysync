@@ -104,12 +104,14 @@ class NoteImageDto {
   final String createdAt;
   final bool ocrProcessed;
   final List<OcrBlockDto> ocrBlocks;
+  final List<NoteDiagramDto> diagrams;
 
   const NoteImageDto({
     required this.imageBytesBase64,
     required this.createdAt,
     required this.ocrProcessed,
     required this.ocrBlocks,
+    this.diagrams = const [],
   });
 
   Map<String, dynamic> toJson() {
@@ -118,11 +120,13 @@ class NoteImageDto {
       'createdAt': createdAt,
       'ocrProcessed': ocrProcessed,
       'ocrBlocks': ocrBlocks.map((b) => b.toJson()).toList(),
+      'diagrams': diagrams.map((d) => d.toJson()).toList(),
     };
   }
 
   static NoteImageDto fromJson(Map<String, dynamic> json) {
     final rawBlocks = (json['ocrBlocks'] as List<dynamic>? ?? const []);
+    final rawDiagrams = (json['diagrams'] as List<dynamic>? ?? const []);
     return NoteImageDto(
       imageBytesBase64: (json['imageBytesBase64'] as String?) ?? '',
       createdAt: (json['createdAt'] as String?) ?? '',
@@ -131,6 +135,43 @@ class NoteImageDto {
           .whereType<Map<String, dynamic>>()
           .map(OcrBlockDto.fromJson)
           .toList(),
+      diagrams: rawDiagrams
+          .whereType<Map<String, dynamic>>()
+          .map(NoteDiagramDto.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class NoteDiagramDto {
+  final String imageBytesBase64;
+  final String quadBase64;
+  final String? explanation;
+  final List<double> embedding;
+
+  const NoteDiagramDto({
+    required this.imageBytesBase64,
+    required this.quadBase64,
+    this.explanation,
+    this.embedding = const [],
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'imageBytesBase64': imageBytesBase64,
+      'quadBase64': quadBase64,
+      'explanation': explanation,
+      'embedding': embedding,
+    };
+  }
+
+  static NoteDiagramDto fromJson(Map<String, dynamic> json) {
+    final rawEmbedding = (json['embedding'] as List<dynamic>? ?? const []);
+    return NoteDiagramDto(
+      imageBytesBase64: (json['imageBytesBase64'] as String?) ?? '',
+      quadBase64: (json['quadBase64'] as String?) ?? '',
+      explanation: json['explanation'] as String?,
+      embedding: rawEmbedding.map((e) => (e as num).toDouble()).toList(),
     );
   }
 }

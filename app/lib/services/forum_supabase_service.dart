@@ -94,19 +94,19 @@ class ForumSupabaseService {
     final courseCodes = await _fetchCourseCodesByIds(courseIds);
 
     return threads
-        .map((t) => t.copyWith(
-              authorUsername: usernames[t.userId],
-              courseCode: courseCodes[t.courseId],
-            ))
+        .map(
+          (t) => t.copyWith(
+            authorUsername: usernames[t.userId],
+            courseCode: courseCodes[t.courseId],
+          ),
+        )
         .toList();
   }
 
   Future<ForumThread> fetchThreadDetail(String threadId) async {
     final row = await supabase
         .from('thread')
-        .select(
-          'thread_id,user_id,course_id,title,content,created_at',
-        )
+        .select('thread_id,user_id,course_id,title,content,created_at')
         .eq('thread_id', threadId)
         .maybeSingle();
     if (row == null) {
@@ -140,7 +140,28 @@ class ForumSupabaseService {
     final userIds = comments.map((c) => c.userId).toSet().toList();
     final usernames = await _fetchUsernamesByIds(userIds);
 
-    return comments.map((c) => c.copyWith(authorUsername: usernames[c.userId])).toList();
+    return comments
+        .map((c) => c.copyWith(authorUsername: usernames[c.userId]))
+        .toList();
+  }
+
+  Future<void> _ensureProfileExists(String userId) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user != null && user.id == userId) {
+        final metaUsername = user.userMetadata?['username']?.toString();
+        final usernameToSave = (metaUsername != null && metaUsername.isNotEmpty)
+            ? metaUsername
+            : user.email?.split('@').first ?? 'Unknown';
+
+        await supabase.from('profiles').upsert({
+          'user_id': userId,
+          'username': usernameToSave,
+        });
+      }
+    } catch (_) {
+      // Ignore errors silently so it doesn't block posting
+    }
   }
 
   Future<String> createThread({
@@ -149,6 +170,7 @@ class ForumSupabaseService {
     required String content,
     required String userId,
   }) async {
+    await _ensureProfileExists(userId);
     final threadId = _uuidV4();
     await supabase.from('thread').insert({
       'thread_id': threadId,
@@ -171,6 +193,7 @@ class ForumSupabaseService {
     required String content,
     String? parentCommentId,
   }) async {
+    await _ensureProfileExists(userId);
     await supabase.from('comment').insert({
       'comment_id': _uuidV4(),
       'thread_id': threadId,
@@ -180,6 +203,4 @@ class ForumSupabaseService {
       'created_at': DateTime.now().toUtc().toIso8601String(),
     });
   }
-
 }
-

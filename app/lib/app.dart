@@ -771,7 +771,15 @@ class _AppShellState extends State<_AppShell> {
           initialQuery: query,
         );
       case ActiveTab.community:
-        return const CommunityPage();
+        return CommunityPage(
+          db: widget.db,
+          onOpenNote: (note) {
+            setState(() {
+              activeTab = ActiveTab.myNotes;
+            });
+            _openCaptured(note);
+          },
+        );
       case ActiveTab.profile:
         return ProfilePage(
           onOpenAuth: (isLogin) {

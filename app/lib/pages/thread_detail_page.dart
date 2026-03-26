@@ -24,11 +24,7 @@ class ThreadDetailPage extends StatefulWidget {
   final String threadId;
   final ObjectBox db;
 
-  const ThreadDetailPage({
-    super.key,
-    required this.threadId,
-    required this.db,
-  });
+  const ThreadDetailPage({super.key, required this.threadId, required this.db});
 
   @override
   State<ThreadDetailPage> createState() => _ThreadDetailPageState();
@@ -94,10 +90,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text(
-              'OK',
-              style: TextStyle(color: Colors.black),
-            ),
+            child: const Text('OK', style: TextStyle(color: Colors.black)),
           ),
         ],
       ),
@@ -149,17 +142,12 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text(
-            'Reply',
-            style: TextStyle(color: Colors.black),
-          ),
+          title: const Text('Reply', style: TextStyle(color: Colors.black)),
           content: TextField(
             controller: controller,
             minLines: 3,
             maxLines: 5,
-            decoration: const InputDecoration(
-              hintText: 'Write your reply...',
-            ),
+            decoration: const InputDecoration(hintText: 'Write your reply...'),
           ),
           actions: [
             TextButton(
@@ -186,9 +174,7 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                   navigator.pop();
                   await _load();
                 } catch (e) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text('Failed: $e')),
-                  );
+                  messenger.showSnackBar(SnackBar(content: Text('Failed: $e')));
                 }
               },
               child: const Text('Post'),
@@ -205,108 +191,109 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
     final tree = buildCommentTree(_comments);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Thread'),
-      ),
+      appBar: AppBar(title: const Text('Thread')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Color(0xFFEF4444)),
+          ? Center(
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Color(0xFFEF4444)),
+              ),
+            )
+          : thread == null
+          ? const Center(child: Text('Thread not found'))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    thread.title,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
-                )
-              : thread == null
-                  ? const Center(child: Text('Thread not found'))
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Posted by ${thread.authorUsername ?? 'Unknown'} in ${thread.courseCode ?? '-'} - ${_timeAgo(thread.createdAt)}',
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    thread.content,
+                    style: const TextStyle(color: AppTheme.textPrimary),
+                  ),
+
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Replies',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  if (tree.isEmpty)
+                    const Text(
+                      'No replies yet. Be the first!',
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    )
+                  else
+                    _CommentTreeView(
+                      nodes: tree,
+                      depth: 0,
+                      onReplyTap: _isLoggedIn
+                          ? (parentId) =>
+                                _showReplyDialog(parentCommentId: parentId)
+                          : null,
+                    ),
+
+                  if (_isLoggedIn) ...[
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.border),
+                      ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text(
-                            thread.title,
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
+                          TextField(
+                            controller: _replyController,
+                            minLines: 3,
+                            maxLines: 5,
+                            decoration: const InputDecoration(
+                              hintText: 'Write a reply...',
+                              border: OutlineInputBorder(),
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Posted by ${thread.authorUsername ?? 'Unknown'} in ${thread.courseCode ?? '-'} - ${_timeAgo(thread.createdAt)}',
-                            style: const TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            thread.content,
-                            style: const TextStyle(color: AppTheme.textPrimary),
-                          ),
-
-                          const SizedBox(height: 18),
-                          const Text(
-                            'Replies',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          if (tree.isEmpty)
-                            const Text(
-                              'No replies yet. Be the first!',
-                              style: TextStyle(color: AppTheme.textSecondary),
-                            )
-                          else
-                            _CommentTreeView(
-                              nodes: tree,
-                              depth: 0,
-                              onReplyTap: (parentId) => _showReplyDialog(
-                                parentCommentId: parentId,
-                              ),
-                            ),
-
-                          const SizedBox(height: 18),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppTheme.border),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                TextField(
-                                  controller: _replyController,
-                                  minLines: 3,
-                                  maxLines: 5,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Write a reply...',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: ElevatedButton(
-                                    onPressed: _isPostingReply
-                                        ? null
-                                        : () => _postReply(),
-                                    child: const Text('Reply'),
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: ElevatedButton(
+                              onPressed: _isPostingReply
+                                  ? null
+                                  : () => _postReply(),
+                              child: const Text('Reply'),
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ],
+                ],
+              ),
+            ),
     );
   }
 }
@@ -314,12 +301,12 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
 class _CommentTreeView extends StatelessWidget {
   final List<CommentNode> nodes;
   final int depth;
-  final void Function(String? parentCommentId) onReplyTap;
+  final void Function(String? parentCommentId)? onReplyTap;
 
   const _CommentTreeView({
     required this.nodes,
     required this.depth,
-    required this.onReplyTap,
+    this.onReplyTap,
   });
 
   @override
@@ -364,14 +351,16 @@ class _CommentTreeView extends StatelessWidget {
                       n.comment.content,
                       style: const TextStyle(color: AppTheme.textPrimary),
                     ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: OutlinedButton(
-                        onPressed: () => onReplyTap(n.comment.commentId),
-                        child: const Text('Reply'),
+                    if (onReplyTap != null) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton(
+                          onPressed: () => onReplyTap!(n.comment.commentId),
+                          child: const Text('Reply'),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -388,4 +377,3 @@ class _CommentTreeView extends StatelessWidget {
     );
   }
 }
-

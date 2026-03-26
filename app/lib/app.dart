@@ -131,6 +131,16 @@ class _AppShellState extends State<_AppShell> {
       // Send the blacked-out image to OCR (falls back to display image if no OCR version)
       final ocrBytes = image.ocrImageBytes ?? image.imageBytes;
       final blocks = await ocr.detect(ocrBytes);
+      // Clear any existing OCR blocks for this image to avoid duplicates on retry.
+      final existingQ = widget.db.ocrBlockBox
+          .query(OcrBlock_.image.equals(image.id))
+          .build();
+      final existingBlocks = existingQ.find();
+      existingQ.close();
+      if (existingBlocks.isNotEmpty) {
+        widget.db.ocrBlockBox
+            .removeMany(existingBlocks.map((e) => e.id).toList());
+      }
       for (final b in blocks) {
         final quadI32 = Int32List.fromList(b.quad);
         final quadBytes = quadI32.buffer.asUint8List();
@@ -566,7 +576,7 @@ class _AppShellState extends State<_AppShell> {
             for (final diagram in result.diagrams) {
               final nd = NoteDiagram(
                  imageBytes: diagram.imageBytes,
-                 quad: Uint8List.fromList(diagram.quad),
+                 quad: Int32List.fromList(diagram.quad).buffer.asUint8List(),
               );
               nd.image.target = img;
               img.diagrams.add(nd);
@@ -628,6 +638,15 @@ class _AppShellState extends State<_AppShell> {
         isEmbFailed: _embFailed.contains(note.id),
         embChunkCount: _countTextChunks(note.id),
         onRetryEmbeddings: () => _runEmbeddingsForNote(note),
+        fetchOcrBlocks: (image) {
+          final q = widget.db.ocrBlockBox
+              .query(OcrBlock_.image.equals(image.id))
+              .build();
+          final blocks = q.find();
+          q.close();
+          blocks.sort((a, b) => a.readingOrder.compareTo(b.readingOrder));
+          return blocks;
+        },
         onPrevImage: _viewingImages.length > 1
             ? () {
                 setState(() {

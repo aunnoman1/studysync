@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:image_picker/image_picker.dart';
 import '../models/note_record.dart';
 import '../theme.dart';
+import '../widgets/note_digital_view.dart';
 
-class NotePhotoViewPage extends StatelessWidget {
+class NotePhotoViewPage extends StatefulWidget {
   final NoteRecord note;
   final VoidCallback onBack;
   final void Function(NoteRecord note, String newTitle) onRename;
@@ -26,6 +28,8 @@ class NotePhotoViewPage extends StatelessWidget {
   final VoidCallback onRetryEmbeddings;
   final VoidCallback? onPrevImage;
   final VoidCallback? onNextImage;
+  /// Fetches OCR blocks for a given image.
+  final List<OcrBlock> Function(NoteImage image) fetchOcrBlocks;
   const NotePhotoViewPage({
     super.key,
     required this.note,
@@ -48,7 +52,62 @@ class NotePhotoViewPage extends StatelessWidget {
     required this.onRetryEmbeddings,
     required this.onPrevImage,
     required this.onNextImage,
+    required this.fetchOcrBlocks,
   });
+
+  @override
+  State<NotePhotoViewPage> createState() => _NotePhotoViewPageState();
+}
+
+class _NotePhotoViewPageState extends State<NotePhotoViewPage> {
+  /// true = digital reconstruction, false = original raw image.
+  bool _showDigital = true;
+
+  /// Cached source image dimensions for the current page.
+  int _srcWidth = 0;
+  int _srcHeight = 0;
+  bool _dimensionsResolved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveImageDimensions();
+  }
+
+  @override
+  void didUpdateWidget(covariant NotePhotoViewPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentIndex != widget.currentIndex ||
+        oldWidget.images != widget.images) {
+      _dimensionsResolved = false;
+      _resolveImageDimensions();
+    }
+  }
+
+  Future<void> _resolveImageDimensions() async {
+    if (widget.images.isEmpty) return;
+    final bytes = widget.images[widget.currentIndex].imageBytes;
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      if (mounted) {
+        setState(() {
+          _srcWidth = frame.image.width;
+          _srcHeight = frame.image.height;
+          _dimensionsResolved = true;
+        });
+      }
+      frame.image.dispose();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _srcWidth = 0;
+          _srcHeight = 0;
+          _dimensionsResolved = true;
+        });
+      }
+    }
+  }
 
   String _formatDate(DateTime dt) {
     final d = dt.toLocal();
@@ -63,7 +122,93 @@ class NotePhotoViewPage extends StatelessWidget {
     final files = await picker.pickMultiImage(imageQuality: 90);
     if (files.isEmpty) return;
     final list = await Future.wait(files.map((f) => f.readAsBytes()));
-    onAddImages(list);
+    widget.onAddImages(list);
+  }
+
+  bool get _hasOcrData => widget.ocrBlockCount > 0;
+
+  Widget _buildViewToggle() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.lightInputFill,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ToggleChip(
+            icon: Icons.auto_awesome_outlined,
+            label: 'Digital',
+            selected: _showDigital,
+            onTap: () => setState(() => _showDigital = true),
+          ),
+          _ToggleChip(
+            icon: Icons.image_outlined,
+            label: 'Original',
+            selected: !_showDigital,
+            onTap: () => setState(() => _showDigital = false),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDigitalView() {
+    if (!_dimensionsResolved) {
+      return SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: const Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    final currentImage = widget.images[widget.currentIndex];
+    final ocrBlocks = widget.fetchOcrBlocks(currentImage);
+    final diagrams = currentImage.diagrams.toList();
+
+    if (ocrBlocks.isEmpty && diagrams.isEmpty) {
+      return SizedBox(
+        height: MediaQuery.of(context).size.height * 0.4,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.text_snippet_outlined,
+                size: 48,
+                color: AppTheme.textSecondary.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'No OCR data for this page yet',
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Switch to "Original" to view the raw image',
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return NoteDigitalView(
+      ocrBlocks: ocrBlocks,
+      diagrams: diagrams,
+      sourceWidth: _srcWidth,
+      sourceHeight: _srcHeight,
+      maxHeight: MediaQuery.of(context).size.height * 0.6,
+    );
   }
 
   @override
@@ -76,13 +221,13 @@ class NotePhotoViewPage extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                onPressed: onBack,
+                onPressed: widget.onBack,
                 icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  note.title,
+                  widget.note.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -95,7 +240,7 @@ class NotePhotoViewPage extends StatelessWidget {
               IconButton(
                 tooltip: 'Rename',
                 onPressed: () async {
-                  final controller = TextEditingController(text: note.title);
+                  final controller = TextEditingController(text: widget.note.title);
                   final newTitle = await showDialog<String>(
                     context: context,
                     builder: (context) {
@@ -128,7 +273,7 @@ class NotePhotoViewPage extends StatelessWidget {
                     },
                   );
                   if (newTitle != null && newTitle.isNotEmpty) {
-                    onRename(note, newTitle);
+                    widget.onRename(widget.note, newTitle);
                   }
                 },
                 icon: const Icon(Icons.edit, color: AppTheme.textSecondary),
@@ -136,7 +281,7 @@ class NotePhotoViewPage extends StatelessWidget {
               IconButton(
                 tooltip: 'Delete',
                 onPressed: () async {
-                  await onDelete();
+                  await widget.onDelete();
                 },
                 icon: const Icon(
                   Icons.delete_outline_rounded,
@@ -150,7 +295,7 @@ class NotePhotoViewPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Created: ${_formatDate(note.createdAt)}',
+                'Created: ${_formatDate(widget.note.createdAt)}',
                 style: const TextStyle(
                   color: AppTheme.textSecondary,
                   fontSize: 12,
@@ -164,7 +309,7 @@ class NotePhotoViewPage extends StatelessWidget {
                     style: TextStyle(color: AppTheme.textSecondary),
                   ),
                   DropdownButton<String>(
-                    value: note.course,
+                    value: widget.note.course,
                     dropdownColor: AppTheme.surface,
                     items: const ['PF', 'OOP', 'DSA', 'DB']
                         .map(
@@ -180,13 +325,13 @@ class NotePhotoViewPage extends StatelessWidget {
                         )
                         .toList(),
                     onChanged: (val) {
-                      if (val != null && val != note.course) {
-                        onUpdateCourse(note, val);
+                      if (val != null && val != widget.note.course) {
+                        widget.onUpdateCourse(widget.note, val);
                       }
                     },
                   ),
                   const SizedBox(width: 16),
-                  if (isOcrProcessing) ...[
+                  if (widget.isOcrProcessing) ...[
                     const SizedBox(
                       width: 16,
                       height: 16,
@@ -200,9 +345,9 @@ class NotePhotoViewPage extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
-                  ] else if (isOcrFailed) ...[
+                  ] else if (widget.isOcrFailed) ...[
                     OutlinedButton(
-                      onPressed: onRetryOcr,
+                      onPressed: widget.onRetryOcr,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -229,7 +374,7 @@ class NotePhotoViewPage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        'OCR processed ($ocrBlockCount)',
+                        'OCR processed (${widget.ocrBlockCount})',
                         style: const TextStyle(
                           color: Color(0xFFBBF7D0),
                           fontSize: 12,
@@ -258,20 +403,20 @@ class NotePhotoViewPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (images.isNotEmpty) ...[
+                if (widget.images.isNotEmpty) ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
                         tooltip: 'Previous image',
-                        onPressed: onPrevImage,
+                        onPressed: widget.onPrevImage,
                         icon: const Icon(
                           Icons.chevron_left,
                           color: AppTheme.textSecondary,
                         ),
                       ),
                       Text(
-                        'Page ${currentIndex + 1} of ${images.length}',
+                        'Page ${widget.currentIndex + 1} of ${widget.images.length}',
                         style: const TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 12,
@@ -279,18 +424,18 @@ class NotePhotoViewPage extends StatelessWidget {
                       ),
                       IconButton(
                         tooltip: 'Next image',
-                        onPressed: onNextImage,
+                        onPressed: widget.onNextImage,
                         icon: const Icon(
                           Icons.chevron_right,
                           color: AppTheme.textSecondary,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      // View toggle (Digital / Original)
+                      _buildViewToggle(),
                       const Spacer(),
                       OutlinedButton(
                         onPressed: () async {
-                          // Desktop: open file selector; mobile/web: multi gallery
-                          // Heuristic: if file_selector is available use it; otherwise fallback
-                          // We attempt gallery first; users can also use desktop file selector below
                           await _addFromGallery();
                         },
                         child: Row(
@@ -303,9 +448,9 @@ class NotePhotoViewPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      if (onDeleteCurrentImage != null)
+                      if (widget.onDeleteCurrentImage != null)
                         OutlinedButton(
-                          onPressed: onDeleteCurrentImage,
+                          onPressed: widget.onDeleteCurrentImage,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFFEF4444),
                           ),
@@ -324,17 +469,21 @@ class NotePhotoViewPage extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  SizedBox(
-                    width: double.infinity,
-                    height: MediaQuery.of(context).size.height * 0.6,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.memory(
-                        images[currentIndex].imageBytes,
-                        fit: BoxFit.contain,
+                  // Content area: digital view or raw image
+                  if (_showDigital)
+                    _buildDigitalView()
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.memory(
+                          widget.images[widget.currentIndex].imageBytes,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
-                  ),
                 ] else ...[
                   Container(
                     height: 240,
@@ -369,8 +518,8 @@ class NotePhotoViewPage extends StatelessWidget {
                     ),
                   ),
                 ],
-                if ((note.textContent ?? '').isNotEmpty) ...[
-                  if (images.isNotEmpty) const SizedBox(height: 12),
+                if ((widget.note.textContent ?? '').isNotEmpty) ...[
+                  if (widget.images.isNotEmpty) const SizedBox(height: 12),
                   Row(
                     children: [
                       const Text(
@@ -381,7 +530,7 @@ class NotePhotoViewPage extends StatelessWidget {
                       OutlinedButton(
                         onPressed: () async {
                           final controller = TextEditingController(
-                            text: note.textContent ?? '',
+                            text: widget.note.textContent ?? '',
                           );
                           final updatedText = await showDialog<String>(
                             context: context,
@@ -416,8 +565,8 @@ class NotePhotoViewPage extends StatelessWidget {
                             ),
                           );
                           if (updatedText != null) {
-                            onUpdateText(
-                              note,
+                            widget.onUpdateText(
+                              widget.note,
                               updatedText.trim().isEmpty ? null : updatedText,
                             );
                           }
@@ -442,12 +591,12 @@ class NotePhotoViewPage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      note.textContent!,
+                      widget.note.textContent!,
                       style: const TextStyle(color: AppTheme.textPrimary),
                     ),
                   ),
                 ] else ...[
-                  if (images.isNotEmpty) const SizedBox(height: 12),
+                  if (widget.images.isNotEmpty) const SizedBox(height: 12),
                   Row(
                     children: [
                       const Text(
@@ -491,7 +640,7 @@ class NotePhotoViewPage extends StatelessWidget {
                             ),
                           );
                           if (newText != null && newText.trim().isNotEmpty) {
-                            onUpdateText(note, newText.trim());
+                            widget.onUpdateText(widget.note, newText.trim());
                           }
                         },
                         child: Row(
@@ -514,7 +663,7 @@ class NotePhotoViewPage extends StatelessWidget {
                       style: TextStyle(color: AppTheme.textSecondary),
                     ),
                     const SizedBox(width: 8),
-                    if (isEmbProcessing) ...[
+                    if (widget.isEmbProcessing) ...[
                       const SizedBox(
                         width: 16,
                         height: 16,
@@ -528,9 +677,9 @@ class NotePhotoViewPage extends StatelessWidget {
                           fontSize: 12,
                         ),
                       ),
-                    ] else if (isEmbFailed) ...[
+                    ] else if (widget.isEmbFailed) ...[
                       OutlinedButton(
-                        onPressed: onRetryEmbeddings,
+                        onPressed: widget.onRetryEmbeddings,
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -546,7 +695,7 @@ class NotePhotoViewPage extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ] else if (note.embeddingProcessed) ...[
+                    ] else if (widget.note.embeddingProcessed) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -557,7 +706,7 @@ class NotePhotoViewPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          'ready ($embChunkCount)',
+                          'ready (${widget.embChunkCount})',
                           style: const TextStyle(
                             color: Color(0xFFBFDBFE),
                             fontSize: 12,
@@ -571,6 +720,55 @@ class NotePhotoViewPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Small toggle chip for Digital / Original view switch.
+class _ToggleChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ToggleChip({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.blue : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: selected ? Colors.white : AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: selected ? Colors.white : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

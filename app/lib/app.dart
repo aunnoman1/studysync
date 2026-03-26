@@ -418,7 +418,42 @@ class _AppShellState extends State<_AppShell> {
         final match = loaded.where((n) => n.id == id).toList();
         _viewingNote = match.isNotEmpty ? match.first : null;
       }
+      _rebuildLocalSyncRows();
     });
+  }
+
+  /// Regenerates [_noteSyncRows] from [_notes], preserving any Drive sync
+  /// state that was already computed (e.g. synced / driveOnly rows).
+  void _rebuildLocalSyncRows() {
+    // Build a lookup of existing rows by local note id.
+    final existingById = <int, NoteSyncStatusRow>{};
+    for (final row in _noteSyncRows) {
+      if (row.localNote != null) existingById[row.localNote!.id] = row;
+    }
+    _noteSyncRows = _notes.map((n) {
+      final existing = existingById[n.id];
+      if (existing != null) {
+        // Keep Drive sync metadata, just refresh the local note reference.
+        return NoteSyncStatusRow(
+          key: existing.key,
+          displayTitle: n.title,
+          state: existing.state,
+          localNote: n,
+          driveFile: existing.driveFile,
+          latestTimestamp: existing.latestTimestamp,
+          conflictResolved: existing.conflictResolved,
+        );
+      }
+      return NoteSyncStatusRow(
+        key: n.title.toLowerCase(),
+        displayTitle: n.title,
+        state: NoteCloudState.localOnly,
+        localNote: n,
+        driveFile: null,
+        latestTimestamp: n.updatedAt,
+        conflictResolved: false,
+      );
+    }).toList();
   }
 
   /// Sync row for the open note (falls back to local-only if not in index yet).
@@ -587,6 +622,7 @@ class _AppShellState extends State<_AppShell> {
           }
           setState(() {
             _notes.insert(0, note);
+            _rebuildLocalSyncRows();
             isCapturingNote = false;
           });
           // Trigger OCR in background (diagram explanations now run after OCR completes)

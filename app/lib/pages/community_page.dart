@@ -114,10 +114,7 @@ class _CommunityPageState extends State<CommunityPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'OK',
-                style: TextStyle(color: Colors.black),
-              ),
+              child: const Text('OK', style: TextStyle(color: Colors.black)),
             ),
           ],
         ),
@@ -144,10 +141,7 @@ class _CommunityPageState extends State<CommunityPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'OK',
-                style: TextStyle(color: Colors.black),
-              ),
+              child: const Text('OK', style: TextStyle(color: Colors.black)),
             ),
           ],
         ),
@@ -155,7 +149,8 @@ class _CommunityPageState extends State<CommunityPage> {
       return;
     }
 
-    int? dialogSelectedCourseId = _selectedCourseId ?? courseOptions.first.courseId;
+    int? dialogSelectedCourseId =
+        _selectedCourseId ?? courseOptions.first.courseId;
 
     // Reset form state when opening the dialog.
     _titleController.text = '';
@@ -180,14 +175,18 @@ class _CommunityPageState extends State<CommunityPage> {
                       const SizedBox(height: 4),
                       const Text(
                         'Course',
-                        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: courseOptions.map((c) {
-                            final isSelected = dialogSelectedCourseId == c.courseId;
+                            final isSelected =
+                                dialogSelectedCourseId == c.courseId;
                             return Padding(
                               padding: const EdgeInsets.only(right: 8.0),
                               child: ChoiceChip(
@@ -203,7 +202,9 @@ class _CommunityPageState extends State<CommunityPage> {
                                 selectedColor: AppTheme.blue.withAlpha(50),
                                 backgroundColor: Colors.white,
                                 labelStyle: TextStyle(
-                                  color: isSelected ? AppTheme.blue : Colors.black,
+                                  color: isSelected
+                                      ? AppTheme.blue
+                                      : Colors.black,
                                 ),
                               ),
                             );
@@ -249,14 +250,18 @@ class _CommunityPageState extends State<CommunityPage> {
                     final content = _contentController.text.trim();
                     if (title.isEmpty || content.isEmpty) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('Title and question are required.')),
+                        const SnackBar(
+                          content: Text('Title and question are required.'),
+                        ),
                       );
                       return;
                     }
 
                     if (dialogSelectedCourseId == null) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('Please select a course.')),
+                        const SnackBar(
+                          content: Text('Please select a course.'),
+                        ),
                       );
                       return;
                     }
@@ -310,7 +315,10 @@ class _CommunityPageState extends State<CommunityPage> {
     q.close();
     chunks.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
 
-    final joined = chunks.map((c) => c.chunkText.trim()).where((s) => s.isNotEmpty).join('\n\n');
+    final joined = chunks
+        .map((c) => c.chunkText.trim())
+        .where((s) => s.isNotEmpty)
+        .join('\n\n');
     return joined.isEmpty ? note.title : joined;
   }
 
@@ -367,17 +375,19 @@ class _CommunityPageState extends State<CommunityPage> {
                         onChanged: (_) => _debouncedRefresh(),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: _showNewPostDialog,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                    if (_isLoggedIn) ...[
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: _showNewPostDialog,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Text('New Post'),
                         ),
-                        child: Text('New Post'),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -402,7 +412,9 @@ class _CommunityPageState extends State<CommunityPage> {
                           selectedColor: AppTheme.blue.withAlpha(50),
                           backgroundColor: AppTheme.surface,
                           labelStyle: TextStyle(
-                            color: _selectedCourseCode == 'All' ? AppTheme.blue : AppTheme.textPrimary,
+                            color: _selectedCourseCode == 'All'
+                                ? AppTheme.blue
+                                : AppTheme.textPrimary,
                           ),
                         ),
                       ),
@@ -425,7 +437,9 @@ class _CommunityPageState extends State<CommunityPage> {
                             selectedColor: AppTheme.blue.withAlpha(50),
                             backgroundColor: AppTheme.surface,
                             labelStyle: TextStyle(
-                              color: isSelected ? AppTheme.blue : AppTheme.textPrimary,
+                              color: isSelected
+                                  ? AppTheme.blue
+                                  : AppTheme.textPrimary,
                             ),
                           ),
                         );
@@ -462,8 +476,10 @@ class _CommunityPageState extends State<CommunityPage> {
                       final meta =
                           'Posted by ${t.authorUsername ?? 'Unknown'} in ${t.courseCode ?? '-'} - ${_timeAgo(t.createdAt)}';
                       final body = _truncate(t.content, 220);
-                      final currentUser = Supabase.instance.client.auth.currentUser;
-                      final isOwner = currentUser != null && t.userId == currentUser.id;
+                      final currentUser =
+                          Supabase.instance.client.auth.currentUser;
+                      final isOwner =
+                          currentUser != null && t.userId == currentUser.id;
 
                       return _ThreadCard(
                         title: t.title,
@@ -474,33 +490,59 @@ class _CommunityPageState extends State<CommunityPage> {
                                 final confirm = await showDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
-                                    title: const Text('Delete Thread', style: TextStyle(color: Colors.black)),
-                                    content: const Text('Are you sure you want to delete this thread?', style: TextStyle(color: Colors.black)),
+                                    title: const Text(
+                                      'Delete Thread',
+                                      style: TextStyle(color: Colors.black),
+                                    ),
+                                    content: const Text(
+                                      'Are you sure you want to delete this thread?',
+                                      style: TextStyle(color: Colors.black),
+                                    ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(ctx).pop(false),
-                                        child: const Text('Cancel', style: TextStyle(color: Colors.black)),
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(false),
+                                        child: const Text(
+                                          'Cancel',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
                                       ),
                                       ElevatedButton(
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                        onPressed: () => Navigator.of(ctx).pop(true),
-                                        child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                        ),
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(true),
+                                        child: const Text(
+                                          'Delete',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
                                       ),
                                     ],
                                   ),
                                 );
                                 if (confirm == true) {
                                   try {
-                                    await _forumService.deleteThread(t.threadId);
+                                    await _forumService.deleteThread(
+                                      t.threadId,
+                                    );
                                     if (!mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Thread deleted successfully')),
+                                      const SnackBar(
+                                        content: Text(
+                                          'Thread deleted successfully',
+                                        ),
+                                      ),
                                     );
                                     _refreshThreads();
                                   } catch (e) {
                                     if (!mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Failed to delete thread: $e')),
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to delete thread: $e',
+                                        ),
+                                      ),
                                     );
                                   }
                                 }
@@ -597,7 +639,10 @@ class _ThreadCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               meta,
-              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 8),
             Text(body, style: const TextStyle(color: AppTheme.textPrimary)),

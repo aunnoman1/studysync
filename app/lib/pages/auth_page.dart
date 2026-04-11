@@ -61,16 +61,34 @@ class _AuthPageState extends State<AuthPage> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
       if (_isLogin) {
-        await supabase.auth.signInWithPassword(email: email, password: password);
+        await supabase.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
       } else {
         await supabase.auth.signUp(
           email: email,
           password: password,
-          data: {
-            'username': _usernameController.text.trim(),
-          },
+          data: {'username': _usernameController.text.trim()},
         );
       }
+
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        final metaUsername = user.userMetadata?['username']?.toString();
+        final usernameToSave = (metaUsername != null && metaUsername.isNotEmpty)
+            ? metaUsername
+            : user.email?.split('@').first ?? 'Guest';
+        try {
+          await supabase.from('profiles').upsert({
+            'user_id': user.id,
+            'username': usernameToSave,
+          });
+        } catch (_) {
+          // Ignore profile upsert errors to not block login
+        }
+      }
+
       widget.onLogin();
       if (mounted) {
         Navigator.of(context).maybePop();
@@ -134,9 +152,12 @@ class _AuthPageState extends State<AuthPage> {
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _usernameController,
-                        decoration: const InputDecoration(labelText: 'Username'),
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Enter a username' : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Username',
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Enter a username'
+                            : null,
                       ),
                     ],
                     const SizedBox(height: 12),
@@ -144,16 +165,18 @@ class _AuthPageState extends State<AuthPage> {
                       controller: _emailController,
                       decoration: const InputDecoration(labelText: 'Email'),
                       keyboardType: TextInputType.emailAddress,
-                      validator: (v) =>
-                          (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                      validator: (v) => (v == null || !v.contains('@'))
+                          ? 'Enter a valid email'
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _passwordController,
                       decoration: const InputDecoration(labelText: 'Password'),
                       obscureText: true,
-                      validator: (v) =>
-                          (v == null || v.length < 6) ? 'Min 6 characters' : null,
+                      validator: (v) => (v == null || v.length < 6)
+                          ? 'Min 6 characters'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(

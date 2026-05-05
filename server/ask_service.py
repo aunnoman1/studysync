@@ -1,12 +1,13 @@
+import asyncio
 import os
 import math
 import inspect
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Callable, Union, Awaitable
 
 import httpx
 from fastapi import HTTPException, FastAPI
 from pydantic import BaseModel, Field
-from langchain_ollama import OllamaLLM
 
 try:
     from dotenv import load_dotenv  # type: ignore
@@ -64,39 +65,59 @@ class ExplainDiagramResponse(BaseModel):
     explanation: str
 
 
-# Initialize Ollama LLM (lazy loading)
-_llm: Optional[OllamaLLM] = None
+# ---------------------------------------------------------------------------
+# LLM provider helpers
+# ---------------------------------------------------------------------------
 
-def _get_llm() -> OllamaLLM:
-    """Get or create the Ollama LLM instance."""
-    global _llm
-    if _llm is None:
+# Ollama — lazy singleton
+_ollama_llm = None
+
+def _get_ollama_llm():
+    global _ollama_llm
+    if _ollama_llm is None:
+        from langchain_ollama import OllamaLLM
         model_name = os.getenv("OLLAMA_MODEL", "phi")
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        _llm = OllamaLLM(model=model_name, base_url=base_url)
-    return _llm
+        _ollama_llm = OllamaLLM(model=model_name, base_url=base_url)
+    return _ollama_llm
 
 
-async def _call_llm(prompt: str, question: str) -> str:
-    """
-    Call Ollama LLM with the given prompt.
-    Uses the model specified in OLLAMA_MODEL env var (default: phi).
-    """
+async def _call_llm_ollama(prompt: str) -> str:
+    llm = _get_ollama_llm()
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        response = await loop.run_in_executor(executor, lambda: llm.invoke(prompt))
+    return str(response.content if hasattr(response, "content") else response)
+
+
+async def _call_llm_google(prompt: str) -> str:
+    from google import genai  # lazy import — only required when LLM_PROVIDER=google
+
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GOOGLE_API_KEY env var is not set")
+    model = os.getenv("GOOGLE_MODEL", "gemma-4-31b-it")
+    client = genai.Client(api_key=api_key)
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        response = await loop.run_in_executor(
+            executor,
+            lambda: client.models.generate_content(model=model, contents=prompt),
+        )
+    return response.text
+
+
+async def _call_llm(prompt: str) -> str:
+    """Dispatch to the configured LLM provider (LLM_PROVIDER env var)."""
+    provider = os.getenv("LLM_PROVIDER", "ollama").lower()
     try:
-        llm = _get_llm()
-        # Run LLM in thread pool since it's synchronous
-        import asyncio
-        from concurrent.futures import ThreadPoolExecutor
-        
-        loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            response = await loop.run_in_executor(
-                executor,
-                lambda: llm.invoke(prompt)
-            )
-        return str(response.content if hasattr(response, 'content') else response)
+        if provider == "google":
+            return await _call_llm_google(prompt)
+        return await _call_llm_ollama(prompt)
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"[ERROR] LLM call failed: {e}")
+        print(f"[ERROR] LLM call failed (provider={provider}): {e}")
         raise HTTPException(status_code=500, detail=f"LLM call failed: {e}") from e
 
 
@@ -271,7 +292,7 @@ The following text is your internal knowledge. You must teach these concepts as 
 **Good Response:** "The Pixel 9 has known stability issues regarding frequent crashes."
 """
         # Send prompt to LLM
-        llm_response = await _call_llm(prompt, question)
+        llm_response = await _call_llm(prompt)
         print(f"[DEBUG] LLM response length: {len(llm_response)}")
         print(f"[DEBUG] LLM response preview: {llm_response[:100]}...")
         
@@ -306,12 +327,10 @@ The following text is your internal knowledge. You must teach these concepts as 
 
     @app.post("/explain-diagram", response_model=ExplainDiagramResponse)
     async def explain_diagram(req: ExplainDiagramRequest) -> ExplainDiagramResponse:
-        """Send a diagram image to the same Ollama model used by the AI tutor."""
-        model_name = os.getenv("OLLAMA_MODEL", "phi")
-        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        print(f"[DIAGRAM] Explaining diagram with model={model_name}")
+        """Send a diagram image to the configured LLM provider."""
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower()
 
-        # Build prompt with optional OCR context
+        # Build text prompt with optional OCR context
         if req.prompt:
             full_prompt = req.prompt
         else:
@@ -326,27 +345,54 @@ The following text is your internal knowledge. You must teach these concepts as 
                 "Describe what it represents, the relationships between "
                 "components, and any key concepts illustrated."
             )
-        print(f"[DIAGRAM] Prompt length: {len(full_prompt)} chars")
+        print(f"[DIAGRAM] provider={provider}, prompt length={len(full_prompt)} chars")
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                payload = {
-                    "model": model_name,
-                    "prompt": full_prompt,
-                    "images": [req.image_base64],
-                    "stream": False,
-                }
-                resp = await client.post(f"{base_url}/api/generate", json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            explanation = data.get("response", "")
+            if provider == "google":
+                import base64
+                from google import genai
+                from google.genai import types
+
+                api_key = os.getenv("GOOGLE_API_KEY")
+                if not api_key:
+                    raise HTTPException(status_code=500, detail="GOOGLE_API_KEY env var is not set")
+                model = os.getenv("GOOGLE_MODEL", "gemma-4-31b-it")
+                image_bytes = base64.b64decode(req.image_base64)
+                image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
+                client = genai.Client(api_key=api_key)
+                loop = asyncio.get_event_loop()
+                with ThreadPoolExecutor() as executor:
+                    response = await loop.run_in_executor(
+                        executor,
+                        lambda: client.models.generate_content(
+                            model=model,
+                            contents=[full_prompt, image_part],
+                        ),
+                    )
+                explanation = response.text
+            else:
+                model_name = os.getenv("OLLAMA_MODEL", "phi")
+                base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    payload = {
+                        "model": model_name,
+                        "prompt": full_prompt,
+                        "images": [req.image_base64],
+                        "stream": False,
+                    }
+                    resp = await client.post(f"{base_url}/api/generate", json=payload)
+                resp.raise_for_status()
+                explanation = resp.json().get("response", "")
+
             print(f"[DIAGRAM] Got explanation ({len(explanation)} chars)")
             return ExplainDiagramResponse(explanation=explanation)
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[ERROR] Diagram explanation failed: {e}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Diagram explanation failed. Is Ollama running with '{model_name}'? Error: {e}",
+                detail=f"Diagram explanation failed (provider={provider}): {e}",
             )
 
 

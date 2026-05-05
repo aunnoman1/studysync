@@ -13,3 +13,4 @@ langchain-text-splitters
 httpx
 langchain-ollama
 langchain-core
+google-genai

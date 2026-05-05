@@ -683,6 +683,14 @@ class _AppShellState extends State<_AppShell> {
           blocks.sort((a, b) => a.readingOrder.compareTo(b.readingOrder));
           return blocks;
         },
+        fetchDiagrams: (image) {
+          final q = widget.db.noteDiagramBox
+              .query(NoteDiagram_.image.equals(image.id))
+              .build();
+          final diagrams = q.find();
+          q.close();
+          return diagrams;
+        },
         onPrevImage: _viewingImages.length > 1
             ? () {
                 setState(() {

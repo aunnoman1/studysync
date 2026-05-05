@@ -30,6 +30,8 @@ class NotePhotoViewPage extends StatefulWidget {
   final VoidCallback? onNextImage;
   /// Fetches OCR blocks for a given image.
   final List<OcrBlock> Function(NoteImage image) fetchOcrBlocks;
+  /// Fetches diagrams for a given image.
+  final List<NoteDiagram> Function(NoteImage image) fetchDiagrams;
   const NotePhotoViewPage({
     super.key,
     required this.note,
@@ -53,6 +55,7 @@ class NotePhotoViewPage extends StatefulWidget {
     required this.onPrevImage,
     required this.onNextImage,
     required this.fetchOcrBlocks,
+    required this.fetchDiagrams,
   });
 
   @override
@@ -166,7 +169,7 @@ class _NotePhotoViewPageState extends State<NotePhotoViewPage> {
 
     final currentImage = widget.images[widget.currentIndex];
     final ocrBlocks = widget.fetchOcrBlocks(currentImage);
-    final diagrams = currentImage.diagrams.toList();
+    final diagrams = widget.fetchDiagrams(currentImage);
 
     if (ocrBlocks.isEmpty && diagrams.isEmpty) {
       return SizedBox(

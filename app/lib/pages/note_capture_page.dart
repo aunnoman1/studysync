@@ -16,6 +16,7 @@ class DiagramExtraction {
 class MaskedImageResult {
   /// Image with colored outlines around diagrams (for display in notes).
   final Uint8List displayImageBytes;
+
   /// Image with diagrams blacked out (sent to OCR).
   final Uint8List ocrImageBytes;
   final List<DiagramExtraction> diagrams;
@@ -30,21 +31,29 @@ class _ProcessPayload {
 }
 
 /// Runs in a background thread to prevent UI freezing while cropping/masking
-Future<List<MaskedImageResult>> _processImagesIsolate(_ProcessPayload payload) async {
+Future<List<MaskedImageResult>> _processImagesIsolate(
+  _ProcessPayload payload,
+) async {
   final results = <MaskedImageResult>[];
 
   for (int i = 0; i < payload.images.length; i++) {
     final bytes = payload.images[i];
     final rects = payload.rects[i];
 
-    if (rects.isEmpty) {
+    var decoded = img.decodeImage(bytes);
+    if (decoded == null) {
       results.add(MaskedImageResult(bytes, bytes, []));
       continue;
     }
 
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) {
-      results.add(MaskedImageResult(bytes, bytes, []));
+    // Always bake orientation so EXIF rotation is applied to pixels.
+    // This prevents the OCR server from receiving sideways images.
+    decoded = img.bakeOrientation(decoded);
+
+    if (rects.isEmpty) {
+      // Re-encode to ensure consistent formatting
+      final jpgBytes = img.encodeJpg(decoded, quality: 90);
+      results.add(MaskedImageResult(jpgBytes, jpgBytes, []));
       continue;
     }
 
@@ -52,14 +61,14 @@ Future<List<MaskedImageResult>> _processImagesIsolate(_ProcessPayload payload) a
     final ocrCopy = decoded.clone();
 
     final extractions = <DiagramExtraction>[];
-    
+
     // Process each marked diagram
     for (final r in rects) {
       int x = r.left.floor();
       int y = r.top.floor();
       int w = r.width.ceil();
       int h = r.height.ceil();
-      
+
       // Safety clamp
       x = x < 0 ? 0 : x;
       y = y < 0 ? 0 : y;
@@ -69,17 +78,32 @@ Future<List<MaskedImageResult>> _processImagesIsolate(_ProcessPayload payload) a
       // Crop the diagram from original
       final cropped = img.copyCrop(decoded, x: x, y: y, width: w, height: h);
       final croppedBytes = img.encodeJpg(cropped, quality: 90);
-      
+
       // Store it with quad coordinates
       final quad = [x, y, x + w, y, x + w, y + h, x, y + h];
       extractions.add(DiagramExtraction(croppedBytes, quad));
 
       // Draw colored outline on the DISPLAY image
       final outlineColor = img.ColorRgb8(0, 200, 255); // cyan
-      img.drawRect(decoded, x1: x, y1: y, x2: x + w, y2: y + h, color: outlineColor, thickness: 3);
+      img.drawRect(
+        decoded,
+        x1: x,
+        y1: y,
+        x2: x + w,
+        y2: y + h,
+        color: outlineColor,
+        thickness: 3,
+      );
 
       // Black out the OCR copy
-      img.fillRect(ocrCopy, x1: x, y1: y, x2: x + w, y2: y + h, color: img.ColorRgb8(0, 0, 0));
+      img.fillRect(
+        ocrCopy,
+        x1: x,
+        y1: y,
+        x2: x + w,
+        y2: y + h,
+        color: img.ColorRgb8(0, 0, 0),
+      );
     }
 
     final displayBytes = img.encodeJpg(decoded, quality: 90);
@@ -90,16 +114,16 @@ Future<List<MaskedImageResult>> _processImagesIsolate(_ProcessPayload payload) a
   return results;
 }
 
-
 class NoteCapturePage extends StatefulWidget {
   final void Function(
     List<MaskedImageResult> processedImages,
     String title,
     String course,
     String? text,
-  ) onSave;
+  )
+  onSave;
   final VoidCallback onCancel;
-  
+
   const NoteCapturePage({
     super.key,
     required this.onSave,
@@ -115,7 +139,9 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
   final List<Uint8List> _images = [];
   final List<List<Rect>> _diagramRects = [];
   bool _isPicking = false;
-  final TextEditingController _titleController = TextEditingController(text: '');
+  final TextEditingController _titleController = TextEditingController(
+    text: '',
+  );
   final List<String> _courses = const ['PF', 'OOP', 'DSA', 'DB'];
   String _selectedCourse = 'PF';
   final TextEditingController _textController = TextEditingController(text: '');
@@ -358,12 +384,18 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                                         onTap: () => _openDiagramEditor(index),
                                         child: Container(
                                           decoration: BoxDecoration(
-                                            color: hasMasks ? Colors.green : Colors.black54,
-                                            borderRadius: BorderRadius.circular(12),
+                                            color: hasMasks
+                                                ? Colors.green
+                                                : Colors.black54,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                           padding: const EdgeInsets.all(6),
                                           child: Icon(
-                                            hasMasks ? Icons.architecture : Icons.crop_free,
+                                            hasMasks
+                                                ? Icons.architecture
+                                                : Icons.crop_free,
                                             size: 18,
                                             color: Colors.white,
                                           ),
@@ -379,8 +411,12 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                                         },
                                         child: Container(
                                           decoration: BoxDecoration(
-                                            color: Colors.redAccent.withOpacity(0.8),
-                                            borderRadius: BorderRadius.circular(12),
+                                            color: Colors.redAccent.withOpacity(
+                                              0.8,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                           padding: const EdgeInsets.all(6),
                                           child: const Icon(
@@ -426,19 +462,27 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                           : () async {
                               setState(() => _isSaving = true);
                               try {
-                                final title = _titleController.text.trim().isEmpty
+                                final title =
+                                    _titleController.text.trim().isEmpty
                                     ? (_images.isEmpty
                                           ? 'Text Note'
                                           : 'Photo Note')
                                     : _titleController.text.trim();
 
-                                final manualText = _textController.text.trim().isEmpty
+                                final manualText =
+                                    _textController.text.trim().isEmpty
                                     ? null
                                     : _textController.text.trim();
 
                                 // Process diagram masking in a background isolate!
-                                final payload = _ProcessPayload(_images, _diagramRects);
-                                final processedImages = await compute(_processImagesIsolate, payload);
+                                final payload = _ProcessPayload(
+                                  _images,
+                                  _diagramRects,
+                                );
+                                final processedImages = await compute(
+                                  _processImagesIsolate,
+                                  payload,
+                                );
 
                                 widget.onSave(
                                   processedImages,
@@ -447,7 +491,13 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                                   manualText,
                                 );
                               } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to process image masks: $e')));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Failed to process image masks: $e',
+                                    ),
+                                  ),
+                                );
                               } finally {
                                 if (mounted) {
                                   setState(() => _isSaving = false);
@@ -457,8 +507,10 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                       // Show a spinner or the text
                       child: _isSaving
                           ? const SizedBox(
-                            height: 24, width: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2))
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Padding(
                               padding: EdgeInsets.symmetric(
                                 horizontal: 16,

@@ -59,7 +59,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
-  # 4. Ask Service (CPU - Orchestrator)
+  # 4. Ask Service (CPU - Orchestrator, uses Google AI)
   ask-service:
     build:
       context: ..
@@ -69,16 +69,15 @@ services:
     environment:
       - HOST=0.0.0.0
       - ASK_PORT=8002
+      - PYTHONUNBUFFERED=1
       # Connect to other services by service name
       - EMBEDDING_SERVER_URL=http://embedding-service:8001
-      # Connect to Ollama
-      - OLLAMA_BASE_URL=http://ollama:11434
-      # OLLAMA_MODEL is loaded from ../server/.env via env_file
     env_file:
       - ../server/.env
     depends_on:
       - embedding-service
-      - ollama
+    volumes:
+      - ../server/ask_service.py:/app/ask_service.py
 
 volumes:
   ollama_data:

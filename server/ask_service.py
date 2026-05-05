@@ -1,12 +1,16 @@
 import asyncio
+import json
 import os
 import math
 import inspect
+import queue
+import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List, Optional, Callable, Union, Awaitable
+from typing import Any, AsyncGenerator, Dict, List, Optional, Callable, Union, Awaitable
 
 import httpx
 from fastapi import HTTPException, FastAPI
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 try:
@@ -105,6 +109,54 @@ async def _call_llm_google(prompt: str) -> str:
             lambda: client.models.generate_content(model=model, contents=prompt),
         )
     return response.text
+
+
+async def _stream_llm_google(prompt: str) -> AsyncGenerator[str, None]:
+    from google import genai
+
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GOOGLE_API_KEY env var is not set")
+    model = os.getenv("GOOGLE_MODEL", "gemma-4-31b-it")
+    client = genai.Client(api_key=api_key)
+    q: queue.Queue = queue.Queue()
+
+    def worker():
+        try:
+            for chunk in client.models.generate_content_stream(model=model, contents=prompt):
+                q.put(chunk.text or "")
+        except Exception as e:
+            q.put(e)
+        finally:
+            q.put(None)
+
+    threading.Thread(target=worker, daemon=True).start()
+    loop = asyncio.get_event_loop()
+    while True:
+        item = await loop.run_in_executor(None, q.get)
+        if item is None:
+            break
+        if isinstance(item, Exception):
+            raise item
+        yield item
+
+
+async def _stream_llm_ollama(prompt: str) -> AsyncGenerator[str, None]:
+    model = os.getenv("OLLAMA_MODEL", "phi")
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        async with client.stream(
+            "POST",
+            f"{base_url}/api/generate",
+            json={"model": model, "prompt": prompt, "stream": True},
+        ) as resp:
+            async for line in resp.aiter_lines():
+                if not line:
+                    continue
+                data = json.loads(line)
+                yield data.get("response", "")
+                if data.get("done"):
+                    break
 
 
 async def _call_llm(prompt: str) -> str:
@@ -324,6 +376,100 @@ The following text is your internal knowledge. You must teach these concepts as 
         response = AskResponse(message=llm_response)
         print(f"[DEBUG] Returning response with message length: {len(response.message)}")
         return response
+
+    @app.post("/ask/stream")
+    async def ask_stream(req: AskRequest):
+        import time
+        t0 = time.monotonic()
+        question = (req.question or "").strip()
+        if not question:
+            raise HTTPException(status_code=400, detail="question must be non-empty")
+
+        try:
+            q_vec = await _call_embed(embed_text_fn, question)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Question embedding failed: {e}") from e
+        print(f"[TIMING] question embed: {time.monotonic()-t0:.2f}s", flush=True)
+
+        # Embed all local chunks and fetch Supabase matches concurrently
+        local_texts = [(lc, (lc.text or "").strip()) for lc in req.local_chunks if (lc.text or "").strip()]
+
+        async def embed_chunk(lc, txt):
+            try:
+                vec = await _call_embed(embed_text_fn, txt)
+                return AskContext(source="local", text=txt,
+                                  score=_cosine_similarity(q_vec, vec),
+                                  note_title=lc.note_title, note_id=lc.note_id)
+            except Exception:
+                return AskContext(source="local", text=txt, score=0.0,
+                                  note_title=lc.note_title, note_id=lc.note_id)
+
+        t1 = time.monotonic()
+        results = await asyncio.gather(
+            _supabase_match(q_vec, req.match_count, req.course_id),
+            *[embed_chunk(lc, txt) for lc, txt in local_texts],
+            return_exceptions=True,
+        )
+        print(f"[TIMING] supabase+chunk embeds (parallel): {time.monotonic()-t1:.2f}s", flush=True)
+
+        supa_hits: List[AskContext] = results[0] if isinstance(results[0], list) else []
+        local_hits: List[AskContext] = [r for r in results[1:] if isinstance(r, AskContext)]
+        local_hits.sort(key=lambda h: h.score, reverse=True)
+
+        contexts = (supa_hits + local_hits)
+        contexts.sort(key=lambda h: h.score, reverse=True)
+        contexts = contexts[:5]
+
+        context_text = "".join(f"{ctx.text}\n\n" for ctx in contexts)
+        prompt = f"""
+### ROLE
+You are a passionate Computer Science Professor. You are explaining a concept to a student during office hours. 
+
+### CONTEXT (INTERNAL MEMORY)
+The following text is your internal knowledge. You must teach these concepts as if you have known them for years. 
+**DO NOT** refer to this text as "the context," "the book," or "the notes."
+
+<internal_memory>
+{context_text}
+</internal_memory>
+
+### STUDENT QUESTION
+{question}
+
+### STRICT STYLE RULES
+1. **Absolute Prohibition on Meta-Talk:**
+   - NEVER use phrases like: "Based on the provided knowledge", "According to the text", "In the examples provided", "As seen in Example 10-6".
+   - If the text says "In Example 10-6 we see...", you must rewrite it to: "For instance, consider a case where..."
+
+2. **Claim the Examples:**
+   - If the context contains a code example, present it as *your* example. 
+   - BAD: "The text shows an inventory class."
+   - GOOD: "Let's look at an inventory class to understand this."
+
+3. **Tone:** Conversational, confident, and direct.
+
+### OUTPUT FORMAT
+(Start directly with the answer. Do not use introductory filler.)
+"""
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower()
+        t2 = time.monotonic()
+
+        async def event_gen():
+            first = True
+            try:
+                gen = _stream_llm_google(prompt) if provider == "google" else _stream_llm_ollama(prompt)
+                async for chunk in gen:
+                    if first:
+                        print(f"[TIMING] time to first token: {time.monotonic()-t2:.2f}s  (total pre-LLM: {time.monotonic()-t0:.2f}s)", flush=True)
+                        first = False
+                    if chunk:
+                        yield f"data: {chunk}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as e:
+                print(f"[TIMING] generator error: {e}", flush=True)
+                yield f"data: [ERROR] {e}\n\n"
+
+        return StreamingResponse(event_gen(), media_type="text/event-stream")
 
     @app.post("/explain-diagram", response_model=ExplainDiagramResponse)
     async def explain_diagram(req: ExplainDiagramRequest) -> ExplainDiagramResponse:

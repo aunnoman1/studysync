@@ -25,9 +25,10 @@ class AITutorPage extends StatefulWidget {
 
 class _AITutorPageState extends State<AITutorPage> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
   final List<_ChatMessage> _messages = [
-    const _ChatMessage(
+    _ChatMessage(
       isUser: false,
       text: 'Hello! How can I help you study today? Ask me anything about your notes.',
     ),
@@ -48,7 +49,20 @@ class _AITutorPageState extends State<AITutorPage> {
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   List<Map<String, dynamic>> _collectLocalChunks({int maxChunks = 8}) {
@@ -71,41 +85,33 @@ class _AITutorPageState extends State<AITutorPage> {
   Future<void> _runAsk() async {
     final question = _controller.text.trim();
     if (question.isEmpty || _isLoading) return;
-    
-    // Add user message to chat
+
+    final botMsg = _ChatMessage(isUser: false, text: '');
     setState(() {
       _isLoading = true;
       _messages.add(_ChatMessage(isUser: true, text: question));
+      _messages.add(botMsg);
       _controller.clear();
     });
-    
+    _scrollToBottom();
+
     try {
       final locals = _collectLocalChunks();
-      final res = await widget.askService.ask(
+      await for (final chunk in widget.askService.askStream(
         question: question,
         localChunks: locals,
-      );
-      
-      // Add AI response to chat
-      if (mounted) {
-        setState(() {
-          _messages.add(_ChatMessage(
-            isUser: false,
-            text: res.message.isEmpty ? 'No response received from LLM.' : res.message,
-          ));
-          _isLoading = false;
-        });
+      )) {
+        if (!mounted) break;
+        setState(() => botMsg.text += chunk);
+        _scrollToBottom();
+      }
+      if (mounted && botMsg.text.isEmpty) {
+        setState(() => botMsg.text = 'No response received from LLM.');
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _messages.add(_ChatMessage(
-            isUser: false,
-            text: 'Error: $e',
-          ));
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => botMsg.text = 'Error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -175,40 +181,28 @@ class _AITutorPageState extends State<AITutorPage> {
 
   Widget _buildResults() {
     return ListView(
-      children: [
-        ..._messages.map((msg) => msg.isUser
-            ? _UserBubble(name: 'You', text: msg.text)
-            : _BotBubble(name: 'StudySync AI', text: msg.text)),
-        if (_isLoading)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Text('StudySync AI', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.bold)),
-                SizedBox(width: 8),
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ],
-            ),
-          ),
-      ],
+      controller: _scrollController,
+      children: _messages.map((msg) {
+        if (msg.isUser) return _UserBubble(name: 'You', text: msg.text);
+        // Show a blinking cursor on the last bot message while streaming
+        final isLive = _isLoading && msg == _messages.last;
+        return _BotBubble(name: 'StudySync AI', text: msg.text, isStreaming: isLive);
+      }).toList(),
     );
   }
 }
 
 class _ChatMessage {
   final bool isUser;
-  final String text;
-  const _ChatMessage({required this.isUser, required this.text});
+  String text;
+  _ChatMessage({required this.isUser, required this.text});
 }
 
 class _BotBubble extends StatelessWidget {
   final String name;
   final String text;
-  const _BotBubble({required this.name, required this.text});
+  final bool isStreaming;
+  const _BotBubble({required this.name, required this.text, this.isStreaming = false});
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +211,19 @@ class _BotBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(name, style: const TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.bold)),
+          Row(
+            children: [
+              Text(name, style: const TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.bold)),
+              if (isStreaming && text.isEmpty) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
@@ -226,7 +232,7 @@ class _BotBubble extends StatelessWidget {
             ),
             padding: const EdgeInsets.all(12),
             child: MarkdownBody(
-              data: text,
+              data: isStreaming ? '$text▍' : text,
               styleSheet: MarkdownStyleSheet(
                 p: const TextStyle(color: AppTheme.textPrimary, fontSize: 16),
                 h1: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 24),

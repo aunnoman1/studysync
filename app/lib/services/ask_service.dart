@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
@@ -34,6 +35,37 @@ class AskService {
     final data = json.decode(res.body) as Map<String, dynamic>;
     final message = (data['message'] ?? '').toString();
     return AskResult(message: message);
+  }
+
+  Stream<String> askStream({
+    required String question,
+    List<Map<String, dynamic>> localChunks = const [],
+    int matchCount = 5,
+    int? courseId,
+  }) async* {
+    final request = http.Request('POST', Uri.parse('$baseUrl/ask/stream'))
+      ..headers['Content-Type'] = 'application/json'
+      ..body = json.encode({
+        'question': question,
+        'local_chunks': localChunks,
+        'match_count': matchCount,
+        'course_id': courseId,
+      });
+    final response = await http.Client().send(request);
+    if (response.statusCode != 200) {
+      throw Exception('Ask stream failed: ${response.statusCode}');
+    }
+    await for (final line in response.stream
+        .toStringStream()
+        .transform(const LineSplitter())) {
+      if (!line.startsWith('data: ')) continue;
+      final payload = line.substring(6);
+      if (payload == '[DONE]') break;
+      if (payload.startsWith('[ERROR]')) {
+        throw Exception(payload.substring(7).trim());
+      }
+      yield payload;
+    }
   }
 
   /// Sends a cropped diagram image to the Ollama VLM for explanation.

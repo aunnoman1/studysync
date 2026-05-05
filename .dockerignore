@@ -12,3 +12,4 @@ report.md
 *.jpg
 *.png
 .DS_Store
+server/venv/

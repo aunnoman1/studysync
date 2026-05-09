@@ -29,6 +29,32 @@ class ForumCourse {
   }
 }
 
+class ThreadAttachment {
+  final String attachmentId;
+  final String threadId;
+  final String fileUrl;
+  final String fileType;
+  final DateTime createdAt;
+
+  const ThreadAttachment({
+    required this.attachmentId,
+    required this.threadId,
+    required this.fileUrl,
+    required this.fileType,
+    required this.createdAt,
+  });
+
+  factory ThreadAttachment.fromJson(Map<String, dynamic> json) {
+    return ThreadAttachment(
+      attachmentId: (json['attachment_id'] ?? '').toString(),
+      threadId: (json['thread_id'] ?? '').toString(),
+      fileUrl: (json['file_url'] ?? '').toString(),
+      fileType: (json['file_type'] ?? '').toString(),
+      createdAt: parseForumDateTime(json['created_at']),
+    );
+  }
+}
+
 class ForumThread {
   final String threadId;
   final String userId;
@@ -43,6 +69,9 @@ class ForumThread {
   /// Filled by the service.
   final String? courseCode;
 
+  /// Filled by the service.
+  final List<ThreadAttachment>? attachments;
+
   const ForumThread({
     required this.threadId,
     required this.userId,
@@ -52,6 +81,7 @@ class ForumThread {
     required this.createdAt,
     this.authorUsername,
     this.courseCode,
+    this.attachments,
   });
 
   factory ForumThread.fromJson(Map<String, dynamic> json) {
@@ -68,6 +98,7 @@ class ForumThread {
   ForumThread copyWith({
     String? authorUsername,
     String? courseCode,
+    List<ThreadAttachment>? attachments,
   }) {
     return ForumThread(
       threadId: threadId,
@@ -78,6 +109,7 @@ class ForumThread {
       createdAt: createdAt,
       authorUsername: authorUsername ?? this.authorUsername,
       courseCode: courseCode ?? this.courseCode,
+      attachments: attachments ?? this.attachments,
     );
   }
 }

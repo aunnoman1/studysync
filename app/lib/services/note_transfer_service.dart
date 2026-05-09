@@ -118,7 +118,8 @@ class NoteTransferService {
         }
 
         imported++;
-      } catch (_) {
+      } catch (e, st) {
+        print('Error importing note: $e\n$st');
         failed++;
       }
     }

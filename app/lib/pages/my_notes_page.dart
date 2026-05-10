@@ -81,6 +81,8 @@ class _MyNotesPageState extends State<MyNotesPage> {
   @override
   Widget build(BuildContext context) {
     final compact = _isCompact(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
     final filteredRows = widget.syncRows.where((row) {
       if (_searchQuery.isEmpty) return true;
       return row.displayTitle.toLowerCase().contains(
@@ -100,29 +102,31 @@ class _MyNotesPageState extends State<MyNotesPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'My Notes',
-            style: TextStyle(
-              fontSize: compact ? 22 : 26,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
-              letterSpacing: -0.5,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppTheme.blue,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'My Notes',
+                style: TextStyle(
+                  fontSize: compact ? 22 : 26,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
           ),
           SizedBox(height: compact ? 12 : 16),
           Container(
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(compact ? 14 : 12),
-              border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: compact ? 12 : 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
+            decoration: AppTheme.cardDecoration(isDark: isDark),
             padding: EdgeInsets.all(compact ? 12 : 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

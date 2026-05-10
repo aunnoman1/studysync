@@ -334,32 +334,40 @@ class _CommunityPageState extends State<CommunityPage> {
   Widget build(BuildContext context) {
     final isEmpty = !_isLoading && _threads.isEmpty && (_error == null);
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+    final textSecondary = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Community Forums',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppTheme.blue,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Community Forums',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           Container(
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
+            decoration: AppTheme.cardDecoration(isDark: isDark),
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -472,7 +480,9 @@ class _CommunityPageState extends State<CommunityPage> {
                   )
                 else
                   Column(
-                    children: _threads.map((t) {
+                    children: _threads.asMap().entries.map((e) {
+                      final idx = e.key;
+                      final t = e.value;
                       final meta =
                           'Posted by ${t.authorUsername ?? 'Unknown'} in ${t.courseCode ?? '-'} - ${_timeAgo(t.createdAt)}';
                       final body = _truncate(t.content, 220);
@@ -482,6 +492,7 @@ class _CommunityPageState extends State<CommunityPage> {
                           currentUser != null && t.userId == currentUser.id;
 
                       return _ThreadCard(
+                        index: idx,
                         title: t.title,
                         meta: meta,
                         body: body,
@@ -582,12 +593,13 @@ class _CommunityPageState extends State<CommunityPage> {
   }
 }
 
-class _ThreadCard extends StatelessWidget {
+class _ThreadCard extends StatefulWidget {
   final String title;
   final String meta;
   final String body;
   final VoidCallback onTap;
   final VoidCallback? onDelete;
+  final int index;
 
   const _ThreadCard({
     required this.title,
@@ -595,58 +607,106 @@ class _ThreadCard extends StatelessWidget {
     required this.body,
     required this.onTap,
     this.onDelete,
+    this.index = 0,
   });
 
   @override
+  State<_ThreadCard> createState() => _ThreadCardState();
+}
+
+class _ThreadCardState extends State<_ThreadCard>
+    with SingleTickerProviderStateMixin {
+  bool _hovering = false;
+  late final AnimationController _entranceController;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _fade = CurvedAnimation(parent: _entranceController, curve: Curves.easeOut);
+    _slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _entranceController, curve: Curves.easeOut));
+    Future.delayed(Duration(milliseconds: widget.index * 60), () {
+      if (mounted) _entranceController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      color: Color(0xFF60A5FA),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+    final textSecondary = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+
+    return SlideTransition(
+      position: _slide,
+      child: FadeTransition(
+        opacity: _fade,
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hovering = true),
+          onExit: (_) => setState(() => _hovering = false),
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: AnimatedContainer(
+              duration: AppTheme.duration,
+              curve: AppTheme.curve,
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.all(16),
+              transform: Matrix4.translationValues(0, _hovering ? -2 : 0, 0),
+              decoration: AppTheme.cardDecoration(
+                hovered: _hovering,
+                isDark: isDark,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          style: const TextStyle(
+                            color: AppTheme.blueLight,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      if (widget.onDelete != null)
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
+                          onPressed: widget.onDelete,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.meta,
+                    style: TextStyle(
+                      color: textSecondary,
+                      fontSize: 12,
                     ),
                   ),
-                ),
-                if (onDelete != null)
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                    onPressed: onDelete,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              meta,
-              style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 12,
+                  const SizedBox(height: 8),
+                  Text(widget.body, style: TextStyle(color: textPrimary)),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(body, style: const TextStyle(color: AppTheme.textPrimary)),
-          ],
+          ),
         ),
       ),
     );

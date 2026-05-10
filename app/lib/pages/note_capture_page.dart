@@ -239,6 +239,10 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+    final textSecondary = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -248,39 +252,39 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
             children: [
               IconButton(
                 onPressed: widget.onCancel,
-                icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
+                icon: Icon(Icons.arrow_back, color: textPrimary),
               ),
               const SizedBox(width: 8),
-              const Text(
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppTheme.blue,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
                 'Create Note (Photo)',
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimary,
+                  color: textPrimary,
+                  letterSpacing: -0.5,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           Container(
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
+            decoration: AppTheme.cardDecoration(isDark: isDark),
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                Text(
                   'Title',
-                  style: TextStyle(color: AppTheme.textSecondary),
+                  style: TextStyle(color: textSecondary),
                 ),
                 const SizedBox(height: 6),
                 TextField(
@@ -290,9 +294,9 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Course',
-                  style: TextStyle(color: AppTheme.textSecondary),
+                  style: TextStyle(color: textSecondary),
                 ),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
@@ -343,101 +347,80 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                // ── Image preview area ──
                 Container(
-                  height: 360,
-                  decoration: BoxDecoration(
-                    color: AppTheme.lightInputFill,
-                    border: Border.all(color: AppTheme.border),
-                    borderRadius: BorderRadius.circular(12),
+                  constraints: const BoxConstraints(
+                    minHeight: 160,
+                    maxHeight: 420,
                   ),
-                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkBackground : AppTheme.lightInputFill,
+                    border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.border),
+                    borderRadius: BorderRadius.circular(AppTheme.radius),
+                  ),
                   child: _images.isEmpty
-                      ? const Text(
-                          'No images selected',
-                          style: TextStyle(color: AppTheme.textSecondary),
-                        )
-                      : ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.all(12),
-                          itemCount: _images.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(width: 12),
-                          itemBuilder: (context, index) {
-                            final imgBytes = _images[index];
-                            final hasMasks = _diagramRects[index].isNotEmpty;
-                            return Stack(
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.memory(
-                                    imgBytes,
-                                    height: 336,
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
-                                Positioned(
-                                  right: 4,
-                                  top: 4,
-                                  child: Row(
-                                    children: [
-                                      InkWell(
-                                        onTap: () => _openDiagramEditor(index),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: hasMasks
-                                                ? Colors.green
-                                                : Colors.black54,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          padding: const EdgeInsets.all(6),
-                                          child: Icon(
-                                            hasMasks
-                                                ? Icons.architecture
-                                                : Icons.crop_free,
-                                            size: 18,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      InkWell(
-                                        onTap: () {
-                                          setState(() {
-                                            _images.removeAt(index);
-                                            _diagramRects.removeAt(index);
-                                          });
-                                        },
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.redAccent.withOpacity(
-                                              0.8,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          padding: const EdgeInsets.all(6),
-                                          child: const Icon(
-                                            Icons.close,
-                                            size: 18,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                Icon(Icons.add_photo_alternate_outlined,
+                                    size: 48,
+                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No images selected',
+                                  style: TextStyle(
+                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                                    fontSize: 15,
                                   ),
                                 ),
                               ],
-                            );
-                          },
+                            ),
+                          ),
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(AppTheme.radius),
+                          child: ReorderableListView.builder(
+                            shrinkWrap: true,
+                            buildDefaultDragHandles: false,
+                            padding: const EdgeInsets.all(10),
+                            itemCount: _images.length,
+                            onReorder: (oldIndex, newIndex) {
+                              setState(() {
+                                if (newIndex > oldIndex) newIndex--;
+                                final img = _images.removeAt(oldIndex);
+                                final rects = _diagramRects.removeAt(oldIndex);
+                                _images.insert(newIndex, img);
+                                _diagramRects.insert(newIndex, rects);
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              final imgBytes = _images[index];
+                              final hasMasks = _diagramRects[index].isNotEmpty;
+                              return _ImageTile(
+                                key: ValueKey('img_${imgBytes.hashCode}_$index'),
+                                index: index,
+                                imageBytes: imgBytes,
+                                hasMasks: hasMasks,
+                                isDark: isDark,
+                                onEdit: () => _openDiagramEditor(index),
+                                onRemove: () {
+                                  setState(() {
+                                    _images.removeAt(index);
+                                    _diagramRects.removeAt(index);
+                                  });
+                                },
+                              );
+                            },
+                          ),
                         ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Note (optional)',
-                  style: TextStyle(color: AppTheme.textSecondary),
+                  style: TextStyle(color: textSecondary),
                 ),
                 const SizedBox(height: 6),
                 SizedBox(
@@ -522,6 +505,150 @@ class _NoteCapturePageState extends State<NoteCapturePage> {
                   ],
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A single image row in the reorderable list.
+/// Shows a thumbnail, index badge, size info, edit/delete actions, and a drag handle.
+class _ImageTile extends StatelessWidget {
+  final int index;
+  final Uint8List imageBytes;
+  final bool hasMasks;
+  final bool isDark;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  const _ImageTile({
+    super.key,
+    required this.index,
+    required this.imageBytes,
+    required this.hasMasks,
+    required this.isDark,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = isDark ? AppTheme.darkSurface : AppTheme.lightSurface;
+    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final textPrimary = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
+    final textSecondary = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+    final sizeKb = (imageBytes.lengthInBytes / 1024).toStringAsFixed(0);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          // ── Drag handle ──
+          ReorderableDragStartListener(
+            index: index,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.grab,
+              child: Icon(Icons.drag_handle_rounded, color: textSecondary, size: 22),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // ── Index badge ──
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: AppTheme.blue.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                '${index + 1}',
+                style: const TextStyle(
+                  color: AppTheme.blue,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // ── Thumbnail ──
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              imageBytes,
+              width: 72,
+              height: 54,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 12),
+          // ── Info ──
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Image ${index + 1}',
+                  style: TextStyle(
+                    color: textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(
+                      '${sizeKb} KB',
+                      style: TextStyle(color: textSecondary, fontSize: 12),
+                    ),
+                    if (hasMasks) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Diagrams marked',
+                          style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // ── Edit (diagram) button ──
+          IconButton(
+            tooltip: hasMasks ? 'Edit diagrams' : 'Mark diagrams',
+            onPressed: onEdit,
+            icon: Icon(
+              hasMasks ? Icons.architecture : Icons.crop_free,
+              color: hasMasks ? Colors.green : textSecondary,
+              size: 20,
+            ),
+          ),
+          // ── Delete button ──
+          IconButton(
+            tooltip: 'Remove image',
+            onPressed: onRemove,
+            icon: const Icon(
+              Icons.close_rounded,
+              color: Color(0xFFEF4444),
+              size: 20,
             ),
           ),
         ],

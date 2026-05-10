@@ -29,6 +29,9 @@ import 'env.dart';
 import 'pages/note_debug_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Global theme notifier so any widget can toggle light ↔ dark.
+final themeModeNotifier = ThemeModeNotifier();
+
 class StudySyncApp extends StatelessWidget {
   final ObjectBox db;
   const StudySyncApp({super.key, required this.db});
@@ -41,11 +44,18 @@ class StudySyncApp extends StatelessWidget {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'StudySync',
-      theme: AppTheme.light(),
-      home: _AppShell(db: db),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeModeNotifier,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'StudySync',
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: mode,
+          home: _AppShell(db: db),
+        );
+      },
     );
   }
 }
@@ -1054,7 +1064,7 @@ class _AppShellState extends State<_AppShell> {
           body: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (showSidebar)
+              if (showSidebar) ...[
                 Sidebar(
                   activeTab: activeTab,
                   onSelectTab: (tab) => setState(() => activeTab = tab),
@@ -1065,9 +1075,10 @@ class _AppShellState extends State<_AppShell> {
                     });
                   },
                 ),
+              ],
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: _buildContent(),
                 ),
               ),

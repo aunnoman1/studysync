@@ -7,6 +7,7 @@ import '../models/forum_models.dart';
 import '../objectbox.dart';
 import '../services/forum_supabase_service.dart';
 import '../theme.dart';
+import 'note_preview_page.dart';
 
 String _timeAgo(DateTime dt) {
   final diff = DateTime.now().toUtc().difference(dt.toUtc());
@@ -229,6 +230,57 @@ class _ThreadDetailPageState extends State<ThreadDetailPage> {
                     thread.content,
                     style: const TextStyle(color: AppTheme.textPrimary),
                   ),
+
+                  if (thread.attachments != null && thread.attachments!.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Attachments',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...thread.attachments!.map((att) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: ListTile(
+                          leading: const Icon(Icons.attachment, color: AppTheme.blue),
+                          title: const Text('Attached Note', style: TextStyle(color: AppTheme.textPrimary)),
+                          trailing: ElevatedButton.icon(
+                            icon: const Icon(Icons.visibility, size: 18),
+                            label: const Text('Preview'),
+                            onPressed: () async {
+                              final scaffoldMsg = ScaffoldMessenger.of(context);
+                              final nav = Navigator.of(context);
+                              try {
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (_) => const Center(child: CircularProgressIndicator()),
+                                );
+                                final bytes = await _service.downloadAttachment(att.fileUrl);
+                                nav.pop(); // dismiss dialog
+                                nav.push(
+                                  MaterialPageRoute(
+                                    builder: (_) => NotePreviewPage(bytes: bytes, db: widget.db),
+                                  ),
+                                );
+                              } catch (e) {
+                                nav.pop(); // dismiss dialog
+                                scaffoldMsg.showSnackBar(SnackBar(content: Text('Failed to load note: $e')));
+                              }
+                            },
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
 
                   const SizedBox(height: 18),
                   const Text(

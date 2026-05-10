@@ -118,9 +118,19 @@ class ForumSupabaseService {
     final usernames = await _fetchUsernamesByIds(<String>[thread.userId]);
     final courseCodes = await _fetchCourseCodesByIds(<int>[thread.courseId]);
 
+    final attachmentRows = await supabase
+        .from('thread_attachment')
+        .select()
+        .eq('thread_id', threadId);
+    final attachments = (attachmentRows as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(ThreadAttachment.fromJson)
+        .toList();
+
     return thread.copyWith(
       authorUsername: usernames[thread.userId],
       courseCode: courseCodes[thread.courseId],
+      attachments: attachments,
     );
   }
 
@@ -169,6 +179,7 @@ class ForumSupabaseService {
     required String title,
     required String content,
     required String userId,
+    Uint8List? attachmentBytes,
   }) async {
     await _ensureProfileExists(userId);
     final threadId = _uuidV4();
@@ -180,11 +191,29 @@ class ForumSupabaseService {
       'content': content,
       'created_at': DateTime.now().toUtc().toIso8601String(),
     });
+
+    if (attachmentBytes != null) {
+      final attachmentId = _uuidV4();
+      final path = 'attachments/$threadId/$attachmentId.studysync';
+      await supabase.storage.from(bucketName).uploadBinary(path, attachmentBytes);
+      await supabase.from('thread_attachment').insert({
+        'attachment_id': attachmentId,
+        'thread_id': threadId,
+        'file_url': path,
+        'file_type': 'studysync',
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    }
+
     return threadId;
   }
 
   Future<void> deleteThread(String threadId) async {
     await supabase.from('thread').delete().eq('thread_id', threadId);
+  }
+
+  Future<Uint8List> downloadAttachment(String path) async {
+    return await supabase.storage.from(bucketName).download(path);
   }
 
   Future<void> createComment({

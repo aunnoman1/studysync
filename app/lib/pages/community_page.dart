@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -151,6 +152,7 @@ class _CommunityPageState extends State<CommunityPage> {
 
     int? dialogSelectedCourseId =
         _selectedCourseId ?? courseOptions.first.courseId;
+    NoteRecord? dialogSelectedNote;
 
     // Reset form state when opening the dialog.
     _titleController.text = '';
@@ -232,6 +234,45 @@ class _CommunityPageState extends State<CommunityPage> {
                         ),
                         maxLines: 6,
                       ),
+                      if (currentNotes.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Attach a Note (Optional)',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<NoteRecord?>(
+                          value: dialogSelectedNote,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          isExpanded: true,
+                          hint: const Text('Select a note to attach', style: TextStyle(color: Colors.black54)),
+                          dropdownColor: Colors.white,
+                          style: const TextStyle(color: Colors.black),
+                          items: [
+                            const DropdownMenuItem<NoteRecord?>(
+                              value: null,
+                              child: Text('None'),
+                            ),
+                            ...currentNotes.map((n) {
+                              return DropdownMenuItem<NoteRecord?>(
+                                value: n,
+                                child: Text(n.title.isNotEmpty ? n.title : 'Untitled Note'),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            setDialogState(() {
+                              dialogSelectedNote = val;
+                            });
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -274,11 +315,18 @@ class _CommunityPageState extends State<CommunityPage> {
                     final messenger = ScaffoldMessenger.of(context);
 
                     try {
+                      Uint8List? attachmentBytes;
+                      if (dialogSelectedNote != null) {
+                        final transferService = NoteTransferService(db: widget.db);
+                        attachmentBytes = transferService.exportNotesToBytes(<int>[dialogSelectedNote!.id]);
+                      }
+
                       final threadId = await _forumService.createThread(
                         courseId: dialogSelectedCourseId!,
                         title: title,
                         content: content,
                         userId: user.id,
+                        attachmentBytes: attachmentBytes,
                       );
 
                       if (!mounted) return;
